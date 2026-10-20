@@ -1,0 +1,16 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "codegraph": {
+      "type": "local",
+      "command": [
+        "C:\\Users\\minhi\\.codegraph\\bin\\codegraph-server.exe",
+        "--mcp"
+      ],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "codegraph_*": "allow"
+  }
+}
