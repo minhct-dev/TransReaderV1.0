@@ -45,15 +45,15 @@ export default function App() {
     <div className="app-container">
       <Sidebar />
 
+      <Header
+        query={query}
+        onQueryChange={setQuery}
+        bookCount={visible.length}
+        onAddFile={handleAddFile}
+      />
+
       <main className="main-content">
         <div className="content-wrapper">
-          <Header
-            query={query}
-            onQueryChange={setQuery}
-            bookCount={visible.length}
-            onAddFile={handleAddFile}
-          />
-
           <section id="library" aria-label="Book library">
             <BookGrid books={visible} />
           </section>
