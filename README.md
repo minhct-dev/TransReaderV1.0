@@ -1,22 +1,30 @@
 # TransReader
 
-Document reader app built with Tauri, React and TypeScript.
+Document reader app built with Tauri v2, React and TypeScript.
 
 ## Layout
 
 ```
-frontend/   React + Vite UI and the Tauri shell (src-tauri/)
-.github/    CI workflows
+src/          React + Vite UI components, pages, data, and types
+src-tauri/    Tauri v2 desktop shell and Rust backend
+public/       Static assets
+.github/      CI workflows
 ```
 
 ## Run the desktop app
 
-```
-cd frontend
+```powershell
 npm install
 npm run tauri dev
+```
+
+## Frontend-only dev (browser)
+
+```powershell
+npm run dev
 ```
 
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+

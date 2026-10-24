@@ -1,0 +1,47 @@
+name: Super-Linter
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+    linting:
+        name: Lint Code Base
+        runs-on: ubuntu-latest
+
+        permissions:
+            # contents permission to clone the repository
+            contents: read
+            packages: read
+            # issues and pull-requests permissions to write results as pull
+            # request comments. Omit them if you don't need summary comments
+            issues: write
+            pull-requests: write
+            # To report GitHub Actions status checks. Omit if you don't need
+            # to update commit status
+            statuses: write
+        
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v6
+              with:
+            #fetch-depth: allow how much git install commit history. 0: all git commit history, 1: only the latest commit. Default is 1
+            # 5 is download 5 lastest commit
+                fetch-depth: 0
+            #allow to persist credentials used to fetch the repository. Default is true
+            #if true, next step can access to origin main branch without authentication. If false, next step need to use personal access token to access origin main branch
+                persist-credentials: false
+
+            - name: Super-linter
+              uses: super-linter/super-linter@v9.0.0
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                VALIDATE_ALL_CODEBASE: false
+                VALIDATE_TYPESCRIPT_ES: true
+                VALIDATE_JAVASCRIPT_ES: true
+                VALIDATE_CSS: true
+                VALIDATE_JSON: true
+                VALIDATE_MARKDOWN: true
+                VALIDATE_RUST_2021: true
+                VALIDATE_GITHUB_ACTIONS: true
+                FILTER_REGEX_EXCLUDE: '(.*node_modules/.*|.*src-tauri/target/.*|.*dist/.*)'
