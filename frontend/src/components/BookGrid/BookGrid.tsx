@@ -1,17 +1,22 @@
-import type { Book } from "../types";
+import type { Book } from "../../types/book";
 import BookCard from "./BookCard";
+import "./BookGrid.css";
 
-export default function BookGrid({ books }: { books: Book[] }) {
+interface BookGridProps {
+  books: Book[];
+}
+
+export default function BookGrid({ books }: BookGridProps) {
   if (books.length === 0) {
     return (
-      <p className="py-24 text-center text-sm text-muted">
+      <p className="book-grid__empty">
         No books match your search.
       </p>
     );
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <ul className="book-grid">
       {books.map((book) => (
         <li key={book.id}>
           <BookCard book={book} />

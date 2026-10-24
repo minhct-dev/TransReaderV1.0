@@ -26,6 +26,12 @@ export const SearchIcon = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const PlusIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base} {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
 export const SettingsIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base} {...p}>
     <circle cx="12" cy="12" r="3" />

@@ -1,0 +1,113 @@
+/* ── Sidebar: collapsed 64px → floating overlay 240px on hover ── */
+
+.sidebar {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 64px;
+  padding: 20px 12px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  box-shadow: none;
+  transition: width 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.sidebar:hover {
+  width: 240px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Brand ── */
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.sidebar__logo {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--color-ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sidebar__title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.sidebar:hover .sidebar__title {
+  opacity: 1;
+}
+
+/* ── Nav items ── */
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 32px;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar__link:hover,
+.sidebar__link--active {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-ink);
+}
+
+.sidebar__link-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar__link-label {
+  opacity: 0;
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.sidebar:hover .sidebar__link-label {
+  opacity: 1;
+}
+
+/* ── Bottom section ── */
+
+.sidebar__bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

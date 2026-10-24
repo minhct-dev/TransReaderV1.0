@@ -1,4 +1,4 @@
-import type { Book } from "../types";
+import type { Book } from "../types/book";
 
 // Mock covers come from Open Library by ISBN. BookCard falls back to a
 // generated cover if an image fails to load (offline, rate limit).

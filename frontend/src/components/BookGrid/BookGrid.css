@@ -1,0 +1,15 @@
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 24px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.book-grid__empty {
+  padding: 96px 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-muted);
+}

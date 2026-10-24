@@ -1,12 +1,3 @@
-export type BookFormat = "PDF" | "DOCX";
+// Re-export from canonical location for backward compatibility.
+export type { Book, BookFormat } from "./types/book";
 
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  topic: string;
-  format: BookFormat;
-  /** Reading progress, 0 to 100. */
-  progress: number;
-  coverUrl: string;
-}
