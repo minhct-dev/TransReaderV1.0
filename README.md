@@ -1,6 +1,21 @@
-# Tauri + React + Typescript
+# TransReader
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Document reader app built with Tauri, React and TypeScript.
+
+## Layout
+
+```
+frontend/   React + Vite UI and the Tauri shell (src-tauri/)
+.github/    CI workflows
+```
+
+## Run the desktop app
+
+```
+cd frontend
+npm install
+npm run tauri dev
+```
 
 ## Recommended IDE Setup
 

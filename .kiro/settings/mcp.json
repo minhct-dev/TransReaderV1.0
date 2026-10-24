@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\minhi\\.codegraph-colby\\node_modules\\@colbymchenry\\codegraph\\npm-shim.js",
+        "serve",
+        "--mcp"
+      ],
+      "disabled": false
+    }
+  }
+}
