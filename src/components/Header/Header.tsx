@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { SearchIcon, PlusIcon } from "../icons";
 import "./Header.css";
 
@@ -6,27 +5,15 @@ interface HeaderProps {
   query: string;
   onQueryChange: (value: string) => void;
   bookCount: number;
-  onAddFile?: (file: File) => void;
+  onAddBook: () => void;
 }
-
-const ACCEPTED = ".pdf,.doc,.docx,.txt";
 
 export default function Header({
   query,
   onQueryChange,
   bookCount,
-  onAddFile,
+  onAddBook,
 }: HeaderProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onAddFile) {
-      onAddFile(file);
-    }
-    e.target.value = "";
-  };
-
   return (
     <header className="header">
       {/* Row 1: Centered Search Bar */}
@@ -55,18 +42,11 @@ export default function Header({
           <button
             type="button"
             className="header__add-btn"
-            onClick={() => inputRef.current?.click()}
+            onClick={onAddBook}
           >
             <PlusIcon width={16} height={16} />
             <span>Add Book</span>
           </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED}
-            className="hidden"
-            onChange={handleFileChange}
-          />
         </div>
       </div>
     </header>
