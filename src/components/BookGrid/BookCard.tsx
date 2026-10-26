@@ -28,10 +28,11 @@ const formatTheme: Record<Book["format"], { bg: string; text: string; iconBg: st
 
 interface BookCardProps {
   book: Book;
+  onOpen?: (book: Book) => void;
   onContextMenu?: (event: MouseEvent<HTMLAnchorElement>, book: Book) => void;
 }
 
-export default function BookCard({ book, onContextMenu }: BookCardProps) {
+export default function BookCard({ book, onOpen, onContextMenu }: BookCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const coverUrl = book.cover_url ?? book.coverUrl;
   const showImage = Boolean(coverUrl && coverUrl.trim().length > 0 && !imgFailed);
@@ -40,6 +41,10 @@ export default function BookCard({ book, onContextMenu }: BookCardProps) {
   return (
     <a
       href={`#book-${book.id}`}
+      onClick={(event) => {
+        event.preventDefault();
+        onOpen?.(book);
+      }}
       onContextMenu={(event) => onContextMenu?.(event, book)}
       className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
     >

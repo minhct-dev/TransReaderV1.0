@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar/Sidebar";
 import Header from "./components/Header/Header";
 import BookGrid from "./components/BookGrid/BookGrid";
+import ReaderCanvas from "./components/Reader/ReaderCanvas";
 import { getLibraryBooks, addBookDialog, deleteBook } from "./services/tauriBridge";
 import type { Book } from "./types/book";
 import "./App.css";
@@ -9,6 +10,8 @@ import "./App.css";
 export default function App() {
   const [books, setBooks] = useState<Book[]>([]);
   const [query, setQuery] = useState("");
+  /** Book open in the reader; `null` shows the library. */
+  const [reading, setReading] = useState<Book | null>(null);
 
   useEffect(() => {
     getLibraryBooks()
@@ -65,10 +68,16 @@ export default function App() {
       <main className="main-content">
         <div className="content-wrapper">
           <section id="library" aria-label="Book library">
-            <BookGrid books={visible} onRemoveBook={handleRemoveBook} />
+            <BookGrid
+              books={visible}
+              onOpenBook={setReading}
+              onRemoveBook={handleRemoveBook}
+            />
           </section>
         </div>
       </main>
+
+      {reading && <ReaderCanvas book={reading} onClose={() => setReading(null)} />}
     </div>
   );
 }

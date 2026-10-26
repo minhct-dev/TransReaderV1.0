@@ -9,6 +9,8 @@ interface BookContextMenuProps {
   onClose: () => void;
   /** Removes the book from the library (backend `delete_book`). */
   onRemoveFromList: (book: Book) => void;
+  /** Opens the reader for this book. */
+  onOpenBook: (book: Book) => void;
 }
 
 interface MenuItem {
@@ -41,6 +43,7 @@ export default function BookContextMenu({
   y,
   onClose,
   onRemoveFromList,
+  onOpenBook,
 }: BookContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
@@ -83,8 +86,7 @@ export default function BookContextMenu({
   }, [onClose]);
 
   const handleOpen = () => {
-    // TODO: Gắn Tauri IPC command vào đây
-    console.log("Action: Open", book);
+    onOpenBook(book);
     onClose();
   };
 

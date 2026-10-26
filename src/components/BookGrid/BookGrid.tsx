@@ -6,6 +6,7 @@ import "./BookGrid.css";
 
 interface BookGridProps {
   books: Book[];
+  onOpenBook: (book: Book) => void;
   onRemoveBook: (book: Book) => void;
 }
 
@@ -15,7 +16,7 @@ interface MenuState {
   y: number;
 }
 
-export default function BookGrid({ books, onRemoveBook }: BookGridProps) {
+export default function BookGrid({ books, onOpenBook, onRemoveBook }: BookGridProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   if (books.length === 0) {
@@ -33,6 +34,7 @@ export default function BookGrid({ books, onRemoveBook }: BookGridProps) {
           <li key={book.id}>
             <BookCard
               book={book}
+              onOpen={onOpenBook}
               onContextMenu={(event, target) => {
                 event.preventDefault();
                 setMenu({ book: target, x: event.clientX, y: event.clientY });
@@ -48,6 +50,7 @@ export default function BookGrid({ books, onRemoveBook }: BookGridProps) {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
+          onOpenBook={onOpenBook}
           onRemoveFromList={onRemoveBook}
         />
       )}
