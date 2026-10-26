@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { MouseEvent } from "react";
 import type { Book } from "../../types/book";
 import { DocumentIcon } from "../icons";
 
@@ -25,7 +26,12 @@ const formatTheme: Record<Book["format"], { bg: string; text: string; iconBg: st
   },
 };
 
-export default function BookCard({ book }: { book: Book }) {
+interface BookCardProps {
+  book: Book;
+  onContextMenu?: (event: MouseEvent<HTMLAnchorElement>, book: Book) => void;
+}
+
+export default function BookCard({ book, onContextMenu }: BookCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const coverUrl = book.cover_url ?? book.coverUrl;
   const showImage = Boolean(coverUrl && coverUrl.trim().length > 0 && !imgFailed);
@@ -34,6 +40,7 @@ export default function BookCard({ book }: { book: Book }) {
   return (
     <a
       href={`#book-${book.id}`}
+      onContextMenu={(event) => onContextMenu?.(event, book)}
       className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
     >
       {/* Cover container */}

@@ -12,6 +12,9 @@ pub struct Book {
     pub progress: u8,
     /// Optional cover image (URL or local path). Stored as SQL NULL when absent.
     pub cover_url: Option<String>,
+    /// NTFS 128-bit file id as uppercase hex. SQL NULL when unavailable.
+    #[serde(default)]
+    pub file_id: Option<String>,
     /// Soft delete flag, stored as INTEGER 0/1.
     #[serde(default)]
     pub is_deleted: bool,

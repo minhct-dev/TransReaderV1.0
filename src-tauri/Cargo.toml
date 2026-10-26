@@ -34,3 +34,7 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Win32_Security is required by windows-sys 0.61 to expose CreateFileW.
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem", "Win32_Foundation", "Win32_System_IO", "Win32_Security"] }

@@ -19,7 +19,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::book::get_all_books,
-            commands::book::add_book
+            commands::book::add_book,
+            commands::book::delete_book
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

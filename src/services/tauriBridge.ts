@@ -27,3 +27,8 @@ export async function addBookDialog(): Promise<Book | null> {
   const dto = await invoke<BookDto | null>("add_book");
   return dto ? mapBookDtoToBook(dto) : null;
 }
+
+/** Soft-delete a book: hides it from the library, keeps the row and the file on disk. */
+export async function deleteBook(id: string): Promise<void> {
+  await invoke<void>("delete_book", { bookId: id });
+}

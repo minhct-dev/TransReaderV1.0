@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::models::book::Book;
 use crate::storage::db::{self, Db};
 use crate::utils::file_parser;
+use crate::utils::win_file_id;
 
 /// Every non-deleted book in the library, newest first.
 #[tauri::command]
@@ -12,14 +13,22 @@ pub fn get_all_books(db: State<'_, Db>) -> Result<Vec<Book>, String> {
     db::get_books(&db)
 }
 
-/// Open the native file picker, then store the chosen document.
-/// Returns `Ok(None)` when the user cancels or the file is already in the library.
+/// Open the native file picker, resolve the file's NTFS id, then store it.
+/// Returns `Ok(None)` only when the user cancels; re-importing a file that is
+/// already in the library returns that book instead of creating a duplicate.
 #[tauri::command]
 pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>, String> {
     let Some(file_path) = pick_document(&app).await? else {
         return Ok(None);
     };
-
+    // `None` off-Windows or when the volume has no file ids; the book is still importable.
+    let file_id = win_file_id::get_file_id(&file_path);
+    // Importing a file that was removed earlier restores the old row instead of
+    // adding a duplicate. An already-active book comes back too, so the
+    // frontend can dedupe it by path.
+    if let Some(existing) = db::revive_book(&db, &file_id, &file_path)? {
+        return Ok(Some(existing));
+    }
     let book = Book {
         id: Uuid::new_v4().to_string(),
         title: file_parser::parse_title_from_path(&file_path),
@@ -27,6 +36,7 @@ pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>,
         topic: "Unknown".to_string(),
         format: file_parser::parse_format_from_path(&file_path),
         file_path,
+        file_id,
         progress: 0,
         cover_url: None,
         is_deleted: false,
@@ -39,6 +49,12 @@ pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>,
     }
 
     Ok(Some(book))
+}
+
+//Delete book
+#[tauri::command]
+pub fn delete_book(db: State<'_, Db>, book_id: String) -> Result<(), String> {
+    db::delete_book(&db, &book_id)
 }
 
 async fn pick_document(app: &AppHandle) -> Result<Option<String>, String> {

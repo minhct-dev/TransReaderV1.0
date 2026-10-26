@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar/Sidebar";
 import Header from "./components/Header/Header";
 import BookGrid from "./components/BookGrid/BookGrid";
-import { getLibraryBooks, addBookDialog } from "./services/tauriBridge";
+import { getLibraryBooks, addBookDialog, deleteBook } from "./services/tauriBridge";
 import type { Book } from "./types/book";
 import "./App.css";
 
@@ -41,6 +41,16 @@ export default function App() {
     }
   };
 
+  const handleRemoveBook = async (book: Book) => {
+    try {
+      await deleteBook(book.id);
+      setBooks((prev) => prev.filter((b) => b.id !== book.id));
+    } catch (err) {
+      console.error("Failed to remove book:", err);
+      window.alert(`Cannot remove "${book.title}" from the library.`);
+    }
+  };
+
   return (
     <div className="app-container">
       <Sidebar />
@@ -55,7 +65,7 @@ export default function App() {
       <main className="main-content">
         <div className="content-wrapper">
           <section id="library" aria-label="Book library">
-            <BookGrid books={visible} />
+            <BookGrid books={visible} onRemoveBook={handleRemoveBook} />
           </section>
         </div>
       </main>
