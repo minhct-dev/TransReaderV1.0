@@ -1,6 +1,6 @@
-use serde ::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Book {
     pub id: String,
     pub title: String,
@@ -8,6 +8,14 @@ pub struct Book {
     pub topic: String,
     pub format: String,
     pub file_path: String,
-    pub progress: u8,    
+    /// Reading progress, 0 – 100.
+    pub progress: u8,
+    /// Optional cover image (URL or local path). Stored as SQL NULL when absent.
     pub cover_url: Option<String>,
+    /// Soft delete flag, stored as INTEGER 0/1.
+    #[serde(default)]
+    pub is_deleted: bool,
+    /// RFC 3339 timestamp, e.g. 2026-10-26T09:30:00.123+00:00.
+    #[serde(default)]
+    pub created_at: String,
 }

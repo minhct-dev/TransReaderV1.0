@@ -18,12 +18,12 @@ function mapBookDtoToBook(dto: BookDto): Book {
 
 /** Fetch all stored books from Rust backend */
 export async function getLibraryBooks(): Promise<Book[]> {
-  const dtos = await invoke<BookDto[]>("get_library_books");
+  const dtos = await invoke<BookDto[]>("get_all_books");
   return dtos.map(mapBookDtoToBook);
 }
 
 /** Open native file dialog via Rust backend and return the imported book */
 export async function addBookDialog(): Promise<Book | null> {
-  const dto = await invoke<BookDto | null>("add_book_dialog");
+  const dto = await invoke<BookDto | null>("add_book");
   return dto ? mapBookDtoToBook(dto) : null;
 }
