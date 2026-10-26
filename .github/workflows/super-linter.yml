@@ -36,7 +36,7 @@ jobs:
               uses: super-linter/super-linter@v9.0.0
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                VALIDATE_ALL_CODEBASE: false
+                VALIDATE_ALL_CODEBASE: true
                 VALIDATE_TYPESCRIPT_ES: true
                 VALIDATE_JAVASCRIPT_ES: true
                 VALIDATE_CSS: true
@@ -44,4 +44,6 @@ jobs:
                 VALIDATE_MARKDOWN: true
                 VALIDATE_RUST_2021: true
                 VALIDATE_GITHUB_ACTIONS: true
+                FIX_RUST_2021: true
+                FIX_TYPESCRIPT_ES: true
                 FILTER_REGEX_EXCLUDE: '(.*node_modules/.*|.*src-tauri/target/.*|.*dist/.*)'
