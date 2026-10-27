@@ -1,0 +1,37 @@
+.annotation-hit {
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.annotation-hit:hover {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+}
+
+@keyframes annotation-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+  18% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.7);
+  }
+  45% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+  }
+  72% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.55);
+  }
+}
+
+.annotation-flash {
+  animation: annotation-flash 1.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .annotation-flash {
+    animation: none;
+    outline: 2px solid rgba(59, 130, 246, 0.8);
+    outline-offset: 1px;
+  }
+}

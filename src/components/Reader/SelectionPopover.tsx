@@ -1,12 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { BookOpen, Plus, Share2 } from "lucide-react";
-
-export const HIGHLIGHT_COLORS = [
-  { name: "Yellow", value: "#facc15" },
-  { name: "Green", value: "#22c55e" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Red", value: "#ef4444" },
-];
+import { HIGHLIGHT_COLORS } from "./annotationUtils";
 
 interface SelectionPopoverProps {
   /** Viewport coordinates of the first selected line. */

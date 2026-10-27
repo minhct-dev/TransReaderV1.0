@@ -35,4 +35,7 @@ jobs:
                 VALIDATE_GITHUB_ACTIONS: true
                 FIX_RUST_2021: true
                 FIX_TYPESCRIPT_ES: true
+                FIX_JAVASCRIPT_ES: true
+                FIX_JSON: true
+                FIX_MARKDOWN: true
                 FILTER_REGEX_EXCLUDE: '(.*node_modules/.*|.*src-tauri/target/.*|.*dist/.*)'

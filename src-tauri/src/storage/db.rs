@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::{params, Connection, ErrorCode};
+use rusqlite::{Connection, ErrorCode, params};
 use tauri::{AppHandle, Manager};
 
 use crate::models::book::Book;
@@ -24,6 +24,20 @@ CREATE TABLE IF NOT EXISTS books (
     is_deleted  INTEGER NOT NULL DEFAULT 0 CHECK (is_deleted IN (0, 1)),
     created_at  TEXT    NOT NULL
 );
+CREATE TABLE IF NOT EXISTS book_annotations (
+    id            TEXT    PRIMARY KEY NOT NULL,
+    book_id       TEXT    NOT NULL,
+    page_number   INTEGER NOT NULL,
+    selected_text TEXT    NOT NULL,
+    color         TEXT    NOT NULL,
+    note_text     TEXT,
+    rects_json    TEXT    NOT NULL,
+    created_at    TEXT    NOT NULL,
+    updated_at    TEXT    NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_annotations_book_page
+    ON book_annotations (book_id, page_number);
 
 -- A path may appear only once among non-deleted rows, so deleting a book lets
 -- the same file be imported again (see `revive_book`).
@@ -48,7 +62,7 @@ impl Db {
     }
 
     /// A poisoned lock still holds a usable connection, so recover instead of panicking.
-    fn conn(&self) -> MutexGuard<'_, Connection> {
+    pub(crate) fn conn(&self) -> MutexGuard<'_, Connection> {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
@@ -66,12 +80,22 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
 /// Open (creating if needed) the database, apply the schema and any migration.
 pub fn init(app: &AppHandle) -> Result<Db, String> {
     let path = db_path(app)?;
-    let conn = Connection::open(&path).map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
+    let conn =
+        Connection::open(&path).map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
     apply_schema(&conn)?;
 
     let db = Db::new(conn);
     import_legacy_json(app, &db);
     Ok(db)
+}
+
+/// In-memory database with the production schema, for unit tests in other
+/// storage modules.
+#[cfg(test)]
+pub(crate) fn test_db() -> Db {
+    let conn = Connection::open_in_memory().expect("open in-memory database");
+    apply_schema(&conn).expect("apply schema");
+    Db::new(conn)
 }
 
 /// An existing reader.db is not changed by `CREATE TABLE IF NOT EXISTS`, so
@@ -209,9 +233,7 @@ fn delete_conn(conn: &Connection, book_id: &str) -> Result<(), String> {
 fn get_books_conn(conn: &Connection) -> Result<Vec<Book>, String> {
     let sql = format!("SELECT {COLS} FROM books WHERE is_deleted = 0 ORDER BY created_at DESC");
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], row_to_book)
-        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], row_to_book).map_err(|e| e.to_string())?;
 
     rows.collect::<rusqlite::Result<Vec<Book>>>()
         .map_err(|e| format!("Cannot read books: {e}"))
@@ -236,7 +258,9 @@ fn row_to_book(row: &rusqlite::Row<'_>) -> rusqlite::Result<Book> {
 /// One-time carry-over from the pre-SQLite store. Never fails the app: on any
 /// problem the old file is left untouched and simply ignored.
 fn import_legacy_json(app: &AppHandle, db: &Db) {
-    let Ok(dir) = app.path().app_data_dir() else { return };
+    let Ok(dir) = app.path().app_data_dir() else {
+        return;
+    };
     let legacy = dir.join("library.json");
     if !legacy.exists() {
         return;
@@ -250,8 +274,12 @@ fn import_legacy_json(app: &AppHandle, db: &Db) {
         return;
     }
 
-    let Ok(text) = std::fs::read_to_string(&legacy) else { return };
-    let Ok(books) = serde_json::from_str::<Vec<Book>>(&text) else { return };
+    let Ok(text) = std::fs::read_to_string(&legacy) else {
+        return;
+    };
+    let Ok(books) = serde_json::from_str::<Vec<Book>>(&text) else {
+        return;
+    };
 
     let mut imported = 0;
     for mut book in books {
@@ -420,9 +448,11 @@ mod tests {
         insert_conn(&conn, &book).unwrap();
         delete_conn(&conn, "no-id").unwrap();
 
-        assert!(revive_conn(&conn, &None, "C:/books/a.pdf")
-            .unwrap()
-            .is_some());
+        assert!(
+            revive_conn(&conn, &None, "C:/books/a.pdf")
+                .unwrap()
+                .is_some()
+        );
     }
 
     /// A stale deleted row can share both path and file id with an active row.
@@ -450,8 +480,10 @@ mod tests {
     #[test]
     fn revive_returns_nothing_for_an_unknown_file() {
         let conn = seeded();
-        assert!(revive_conn(&conn, &Some("UNKNOWN".into()), "C:/books/x.pdf")
-            .unwrap()
-            .is_none());
+        assert!(
+            revive_conn(&conn, &Some("UNKNOWN".into()), "C:/books/x.pdf")
+                .unwrap()
+                .is_none()
+        );
     }
 }

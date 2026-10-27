@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Book, BookDto } from "../types/book";
+import type { BookAnnotation } from "../types/annotation";
 
 function mapBookDtoToBook(dto: BookDto): Book {
   const cover = dto.cover_url ?? null;
@@ -31,4 +32,35 @@ export async function addBookDialog(): Promise<Book | null> {
 /** Soft-delete a book: hides it from the library, keeps the row and the file on disk. */
 export async function deleteBook(id: string): Promise<void> {
   await invoke<void>("delete_book", { bookId: id });
+}
+
+/** Persist a new highlight or note. The object must carry its id and timestamps. */
+export async function addAnnotation(annotation: BookAnnotation): Promise<void> {
+  await invoke<void>("add_annotation", { annotation });
+}
+
+/** Every annotation of a book, ordered by page by the Rust side. */
+export async function getAnnotationsByBook(bookId: string): Promise<BookAnnotation[]> {
+  return invoke<BookAnnotation[]>("get_annotations_by_book", { bookId });
+}
+
+/** Every annotation on one page of a book. */
+export async function getAnnotationsByPage(
+  bookId: string,
+  pageNumber: number,
+): Promise<BookAnnotation[]> {
+  return invoke<BookAnnotation[]>("get_annotations_by_page", { bookId, pageNumber });
+}
+
+/** Set or clear the note attached to an existing highlight. */
+export async function updateAnnotationNote(
+  annotationId: string,
+  noteText: string | null,
+): Promise<void> {
+  await invoke<void>("update_annotation_note", { annotationId, noteText });
+}
+
+/** Permanently remove a highlight and its note. */
+export async function deleteAnnotation(annotationId: string): Promise<void> {
+  await invoke<void>("delete_annotation", { annotationId });
 }

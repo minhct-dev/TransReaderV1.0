@@ -20,7 +20,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::book::get_all_books,
             commands::book::add_book,
-            commands::book::delete_book
+            commands::book::delete_book,
+            commands::book_annotation::add_annotation,
+            commands::book_annotation::get_annotations_by_book,
+            commands::book_annotation::get_annotations_by_page,
+            commands::book_annotation::update_annotation_note,
+            commands::book_annotation::delete_annotation
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

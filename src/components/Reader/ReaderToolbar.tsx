@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { READER_PALETTES } from "./readerTheme";
 import type { ReaderTheme } from "./readerTheme";
+import { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM } from "./readerZoom";
 
 interface ReaderToolbarProps {
   title: string;
@@ -21,6 +22,11 @@ interface ReaderToolbarProps {
   onFontSizeChange: (size: number) => void;
   theme: ReaderTheme;
   onThemeChange: (theme: ReaderTheme) => void;
+  /** Page zoom, in percent. */
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
   /** Returns false when nothing in the book matches. */
   onSearch: (query: string) => boolean;
   onClose: () => void;
@@ -45,6 +51,10 @@ export default function ReaderToolbar({
   onFontSizeChange,
   theme,
   onThemeChange,
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
   onSearch,
   onClose,
 }: ReaderToolbarProps) {
@@ -205,7 +215,39 @@ export default function ReaderToolbar({
         {title}
       </h1>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1.5">
+        <div
+          role="group"
+          aria-label="Zoom controls"
+          className="flex items-center rounded-md border border-[var(--r-border)]"
+        >
+          <ToolbarButton
+            label="Zoom out"
+            onClick={onZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+          >
+            <Minus size={14} />
+          </ToolbarButton>
+
+          <button
+            type="button"
+            onClick={onZoomReset}
+            aria-label={`Reset zoom to ${DEFAULT_ZOOM}% (currently ${zoom}%)`}
+            title={`Reset zoom to ${DEFAULT_ZOOM}%`}
+            className="h-8 min-w-11 rounded-md px-1 text-center text-[11px] font-medium tabular-nums text-[var(--r-ink)] transition-colors hover:bg-[var(--r-tint)]"
+          >
+            {zoom}%
+          </button>
+
+          <ToolbarButton
+            label="Zoom in"
+            onClick={onZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+          >
+            <Plus size={14} />
+          </ToolbarButton>
+        </div>
+
         <ToolbarButton label="Close reader" onClick={onClose}>
           <X size={17} />
         </ToolbarButton>
@@ -217,11 +259,13 @@ export default function ReaderToolbar({
 function ToolbarButton({
   label,
   active,
+  disabled,
   onClick,
   children,
 }: {
   label: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -230,11 +274,12 @@ function ToolbarButton({
       type="button"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onClick}
-      className={`grid size-8 place-items-center rounded-md transition-colors ${
+      className={`grid size-8 place-items-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
         active
           ? "bg-[var(--r-tint)] text-[var(--r-ink)]"
-          : "text-[var(--r-muted)] hover:bg-[var(--r-tint)] hover:text-[var(--r-ink)]"
+          : "text-[var(--r-muted)] enabled:hover:bg-[var(--r-tint)] enabled:hover:text-[var(--r-ink)]"
       }`}
     >
       {children}
