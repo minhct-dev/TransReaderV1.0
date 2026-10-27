@@ -57,6 +57,12 @@ pub fn delete_book(db: State<'_, Db>, book_id: String) -> Result<(), String> {
     db::delete_book(&db, &book_id)
 }
 
+/// Absolute path of a library book, for the webview to turn into an asset URL.
+#[tauri::command]
+pub fn resolve_book_path(db: State<'_, Db>, book_id: String) -> Result<String, String> {
+    db::book_path(&db, &book_id)
+}
+
 async fn pick_document(app: &AppHandle) -> Result<Option<String>, String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
 

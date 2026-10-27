@@ -34,6 +34,11 @@ export async function deleteBook(id: string): Promise<void> {
   await invoke<void>("delete_book", { bookId: id });
 }
 
+/** Absolute path on disk of a book still in the library, for `convertFileSrc`. */
+export async function resolveBookPath(bookId: string): Promise<string> {
+  return invoke<string>("resolve_book_path", { bookId });
+}
+
 /** Persist a new highlight or note. The object must carry its id and timestamps. */
 export async function addAnnotation(annotation: BookAnnotation): Promise<void> {
   await invoke<void>("add_annotation", { annotation });

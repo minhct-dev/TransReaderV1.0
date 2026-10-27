@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Highlighter, Loader2, MessageSquare, X } from "lucide-react";
-import { READER_PAGES, TABLE_OF_CONTENTS } from "./readerContent";
-import type { ReaderPage } from "./readerContent";
+import { Thumbnail } from "react-pdf";
+import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { TocEntry } from "./readerOutline";
 import type { BookAnnotation } from "../../types/annotation";
 import { sortAnnotations } from "./annotationUtils";
 
@@ -12,9 +13,18 @@ interface ReaderSidebarProps {
   annotations: BookAnnotation[];
   annotationsLoading: boolean;
   onSelectAnnotation: (annotation: BookAnnotation) => void;
+  pdf: PDFDocumentProxy | null;
+  numPages: number;
+  /** Page width ÷ height, used to reserve thumbnail space before it renders. */
+  pageAspect: number;
+  outline: TocEntry[];
+  outlineLoading: boolean;
 }
 
 type Tab = "contents" | "pages" | "notes";
+
+/** Thumbnail width in CSS pixels; the sidebar column is 248px wide. */
+const THUMBNAIL_WIDTH = 208;
 
 export default function ReaderSidebar({
   currentPage,
@@ -23,6 +33,11 @@ export default function ReaderSidebar({
   annotations,
   annotationsLoading,
   onSelectAnnotation,
+  pdf,
+  numPages,
+  pageAspect,
+  outline,
+  outlineLoading,
 }: ReaderSidebarProps) {
   const [tab, setTab] = useState<Tab>("pages");
   const currentRef = useRef<HTMLButtonElement>(null);
@@ -66,14 +81,14 @@ export default function ReaderSidebar({
       <div className="flex-1 overflow-y-auto">
         {tab === "pages" ? (
           <ul className="space-y-4 px-3 py-4">
-            {READER_PAGES.map((page) => {
-              const isCurrent = page.page === currentPage;
+            {Array.from({ length: numPages }, (_, index) => index + 1).map((pageNumber) => {
+              const isCurrent = pageNumber === currentPage;
               return (
-                <li key={page.page}>
+                <li key={pageNumber}>
                   <button
                     ref={isCurrent ? currentRef : undefined}
                     type="button"
-                    onClick={() => onSelectPage(page.page)}
+                    onClick={() => onSelectPage(pageNumber)}
                     aria-current={isCurrent ? "page" : undefined}
                     className="group block w-full outline-none"
                   >
@@ -84,16 +99,18 @@ export default function ReaderSidebar({
                           : "border-transparent group-hover:border-[var(--r-muted)] group-focus-visible:border-blue-400"
                       }`}
                     >
-                      <div className="aspect-[3/4] overflow-hidden rounded-[2px] bg-[#fdfcf9] shadow-sm">
-                        <PagePreview page={page} />
-                      </div>
+                      <LazyThumbnail
+                        pdf={pdf}
+                        pageNumber={pageNumber}
+                        aspect={pageAspect}
+                      />
                     </div>
                     <span
                       className={`mt-1.5 block text-center text-[11px] tabular-nums ${
                         isCurrent ? "font-semibold text-blue-500" : "text-[var(--r-muted)]"
                       }`}
                     >
-                      {page.page}
+                      {pageNumber}
                     </span>
                   </button>
                 </li>
@@ -101,29 +118,44 @@ export default function ReaderSidebar({
             })}
           </ul>
         ) : tab === "contents" ? (
-          <ul className="px-2 py-3">
-            {TABLE_OF_CONTENTS.map((entry) => {
-              const isCurrent = entry.page === currentPage;
-              return (
-                <li key={entry.title}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectPage(entry.page)}
-                    className={`flex w-full items-baseline gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${
-                      isCurrent
-                        ? "bg-[var(--r-tint)] text-[var(--r-ink)]"
-                        : "text-[var(--r-ink)] hover:bg-[var(--r-tint)]"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[12px]">{entry.title}</span>
-                    <span className="text-[11px] tabular-nums text-[var(--r-muted)]">
-                      {entry.page}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          outlineLoading ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-10 text-[11px] text-[var(--r-muted)]">
+              <Loader2 size={14} className="animate-spin" />
+              Reading contents…
+            </div>
+          ) : outline.length === 0 ? (
+            <p className="px-5 py-10 text-center text-[11.5px] leading-relaxed text-[var(--r-muted)]">
+              This PDF has no table of contents.
+              <br />
+              Use the Pages tab to move around.
+            </p>
+          ) : (
+            <ul className="px-2 py-3">
+              {outline.map((entry, index) => {
+                const isCurrent = entry.page === currentPage;
+                return (
+                  <li key={`${entry.page}-${index}`}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectPage(entry.page)}
+                      title={entry.title}
+                      className={`flex w-full items-baseline gap-2 rounded-md py-2 pr-2.5 text-left transition-colors ${
+                        isCurrent
+                          ? "bg-[var(--r-tint)] text-[var(--r-ink)]"
+                          : "text-[var(--r-ink)] hover:bg-[var(--r-tint)]"
+                      }`}
+                      style={{ paddingLeft: 10 + Math.min(entry.depth, 2) * 12 }}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[12px]">{entry.title}</span>
+                      <span className="text-[11px] tabular-nums text-[var(--r-muted)]">
+                        {entry.page}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )
         ) : annotationsLoading ? (
           <div className="flex items-center justify-center gap-2 px-4 py-10 text-[11px] text-[var(--r-muted)]">
             <Loader2 size={14} className="animate-spin" />
@@ -185,6 +217,63 @@ export default function ReaderSidebar({
   );
 }
 
+/**
+ * A 300-page book must not mount 300 canvases at once. The slot keeps the page
+ * ratio so the list does not jump, and the thumbnail is only drawn once the
+ * slot scrolls near the viewport.
+ */
+function LazyThumbnail({
+  pdf,
+  pageNumber,
+  aspect,
+}: {
+  pdf: PDFDocumentProxy | null;
+  pageNumber: number;
+  aspect: number;
+}) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [isNear, setIsNear] = useState(false);
+
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot || isNear) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsNear(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px 0px" },
+    );
+
+    observer.observe(slot);
+    return () => observer.disconnect();
+  }, [isNear]);
+
+  return (
+    <div
+      ref={slotRef}
+      style={{ aspectRatio: aspect }}
+      className="grid w-full place-items-center overflow-hidden rounded-[2px] bg-[#fdfcf9] shadow-sm"
+    >
+      {isNear && pdf ? (
+        <Thumbnail
+          pdf={pdf}
+          pageNumber={pageNumber}
+          width={THUMBNAIL_WIDTH}
+          className="block"
+          loading={<span className="text-[10px] text-[#b9b4ab]">{pageNumber}</span>}
+          error={<span className="text-[10px] text-[#b9b4ab]">{pageNumber}</span>}
+        />
+      ) : (
+        <span className="text-[10px] tabular-nums text-[#d6d1c8]">{pageNumber}</span>
+      )}
+    </div>
+  );
+}
+
 function TabButton({
   active,
   onClick,
@@ -206,17 +295,5 @@ function TabButton({
     >
       {children}
     </button>
-  );
-}
-
-/** Tiny typeset version of a page: at this size the text reads as a page, which
- *  is all a thumbnail has to do until real page images exist. */
-function PagePreview({ page }: { page: ReaderPage }) {
-  const text = `${page.heading ? `${page.heading}. ` : ""}${page.paragraphs.join(" ")}`;
-
-  return (
-    <div className="h-full w-full overflow-hidden px-[6px] py-[8px]">
-      <p className="text-[4.5px] leading-[1.75] text-[#3f3f3f]/85">{text.slice(0, 1600)}</p>
-    </div>
   );
 }

@@ -2,10 +2,15 @@ name: Super-Linter
 on:
   push:
     branches: [main]
+    # paths:
+    #   - 'src/**'
+    #   - 'src-tauri/**'
   pull_request:
     branches: [main]
+  
 permissions:
   contents: read
+  issues: write
 jobs:
     linting:
         name: Lint Code Base

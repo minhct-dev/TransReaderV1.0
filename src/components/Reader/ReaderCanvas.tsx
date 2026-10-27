@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, FileWarning, Loader2, X } from "lucide-react";
+import { Document, Page } from "react-pdf";
+import type { PDFDocumentProxy } from "pdfjs-dist";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import ReaderToolbar from "./ReaderToolbar";
 import ReaderSidebar from "./ReaderSidebar";
 import SelectionPopover from "./SelectionPopover";
 import AnnotationOverlay from "./AnnotationOverlay";
 import AnnotationPopover from "./AnnotationPopover";
 import NoteComposer from "./NoteComposer";
-import { READER_PAGES } from "./readerContent";
+import { loadOutline } from "./readerOutline";
+import type { TocEntry } from "./readerOutline";
 import { READER_PALETTES } from "./readerTheme";
 import type { ReaderTheme } from "./readerTheme";
 import { DEFAULT_ZOOM, ZOOM_STEP, clampZoom } from "./readerZoom";
@@ -24,9 +28,11 @@ import {
   addAnnotation,
   deleteAnnotation,
   getAnnotationsByBook,
+  resolveBookPath,
   updateAnnotationNote,
 } from "../../services/tauriBridge";
 import type { Book } from "../../types/book";
+import "./pdfSetup";
 
 interface ReaderCanvasProps {
   book: Book;
@@ -54,11 +60,19 @@ interface ActiveAnnotation {
 
 const EMPTY_ANNOTATIONS: BookAnnotation[] = [];
 
+/** Used until page 1 has been measured, and for documents that hide its size. */
+const FALLBACK_PAGE_SIZE = { width: 595, height: 842 };
+
+/** Pages either side of the current one that hold a live canvas. */
+const RENDER_WINDOW = 2;
+
+/** Horizontal breathing room around the page column, in CSS pixels. */
+const COLUMN_GUTTER = 48;
+
 export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectionMenu, setSelectionMenu] = useState<SelectionMenu | null>(null);
-  const [fontSize, setFontSize] = useState(19);
   const [theme, setTheme] = useState<ReaderTheme>("light");
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [annotations, setAnnotations] = useState<BookAnnotation[]>([]);
@@ -68,12 +82,23 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   const [focusedAnnotationId, setFocusedAnnotationId] = useState<string | null>(null);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
 
+  const [assetUrl, setAssetUrl] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [pageSize, setPageSize] = useState(FALLBACK_PAGE_SIZE);
+  const [outline, setOutline] = useState<TocEntry[]>([]);
+  const [outlineLoading, setOutlineLoading] = useState(true);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLElement | null)[]>([]);
   const focusTimerRef = useRef<number | null>(null);
+  const zoomTouchedRef = useRef(false);
+  const textCacheRef = useRef(new Map<number, string>());
+  const searchTokenRef = useRef(0);
 
-  const totalPages = READER_PAGES.length;
-  const percent = Math.round((currentPage / totalPages) * 100);
+  const totalPages = numPages;
+  const percent = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
   const sortedAnnotations = useMemo(() => sortAnnotations(annotations), [annotations]);
   const annotationsByPage = useMemo(() => {
     const grouped = new Map<number, BookAnnotation[]>();
@@ -84,6 +109,56 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     }
     return grouped;
   }, [sortedAnnotations]);
+
+  const pageNumbers = useMemo(
+    () => Array.from({ length: numPages }, (_, index) => index + 1),
+    [numPages],
+  );
+
+  const zoomScale = zoom / 100;
+  const pageWidth = Math.round(pageSize.width * zoomScale);
+  const pageHeight = Math.round(pageSize.height * zoomScale);
+  const pageAspect = pageSize.width / pageSize.height;
+
+  // Ask Rust for the real path, then hand the webview an asset URL it may load.
+  useEffect(() => {
+    let cancelled = false;
+
+    setAssetUrl(null);
+    setUnavailable(null);
+    setPdf(null);
+    setNumPages(0);
+    setOutline([]);
+    setOutlineLoading(true);
+    setCurrentPage(1);
+    setActiveAnnotation(null);
+    setNoteDraft(null);
+    setSelectionMenu(null);
+    textCacheRef.current.clear();
+    zoomTouchedRef.current = false;
+
+    if (book.format !== "PDF") {
+      setUnavailable(
+        `${book.format} files cannot be read yet. Only PDF books open in the reader.`,
+      );
+      setOutlineLoading(false);
+      return;
+    }
+
+    resolveBookPath(book.id)
+      .then((path) => {
+        if (!cancelled) setAssetUrl(convertFileSrc(path));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setUnavailable(errorMessage(error, "This book's file could not be found."));
+        setOutlineLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [book.id, book.format]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,14 +281,17 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   );
 
   const handleZoomOut = useCallback(() => {
+    zoomTouchedRef.current = true;
     setZoom((current) => clampZoom(current - ZOOM_STEP));
   }, []);
 
   const handleZoomIn = useCallback(() => {
+    zoomTouchedRef.current = true;
     setZoom((current) => clampZoom(current + ZOOM_STEP));
   }, []);
 
   const handleZoomReset = useCallback(() => {
+    zoomTouchedRef.current = true;
     setZoom(DEFAULT_ZOOM);
   }, []);
 
@@ -226,6 +304,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     const handleWheel = (event: WheelEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) return;
       event.preventDefault();
+      zoomTouchedRef.current = true;
       setZoom((current) =>
         clampZoom(current + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)),
       );
@@ -235,13 +314,48 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     return () => element.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Zoom and font size reflow the page column: re-measure the reading line and
-  // drop any popover pinned to the old text position.
+  // Zoom reflows the page column: re-measure the reading line and drop any
+  // popover pinned to the old text position.
   useEffect(() => {
     closeSelectionMenu();
     setActiveAnnotation(null);
     updateCurrentPage();
-  }, [zoom, fontSize, closeSelectionMenu, updateCurrentPage]);
+  }, [zoom, closeSelectionMenu, updateCurrentPage]);
+
+  const handleDocumentLoad = useCallback((loaded: PDFDocumentProxy) => {
+    setPdf(loaded);
+    setNumPages(loaded.numPages);
+    setUnavailable(null);
+
+    loaded
+      .getPage(1)
+      .then((page) => {
+        const viewport = page.getViewport({ scale: 1 });
+        setPageSize({ width: viewport.width, height: viewport.height });
+      })
+      .catch(() => setPageSize(FALLBACK_PAGE_SIZE));
+
+    loadOutline(loaded)
+      .then(setOutline)
+      .catch(() => setOutline([]))
+      .finally(() => setOutlineLoading(false));
+  }, []);
+
+  // Open at fit-width so a portrait page never starts out cropped; the zoom
+  // controls still speak in absolute percentages from here on. The browser has
+  // laid the page column out by the time this effect runs, so the measurement
+  // is already final.
+  useEffect(() => {
+    if (numPages === 0 || zoomTouchedRef.current) return;
+
+    const root = scrollRef.current;
+    if (!root) return;
+
+    const available = root.clientWidth - COLUMN_GUTTER;
+    if (available > 0) {
+      setZoom(clampZoom(Math.round((available / pageSize.width) * 100)));
+    }
+  }, [pageSize, numPages]);
 
   const captureSelection = useCallback(() => {
     const selection = window.getSelection();
@@ -366,18 +480,44 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     }
   };
 
-  const handleSearch = (query: string) => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return false;
+  // Search reads each page's text once and remembers it, so a second search in
+  // the same book is instant. `searchTokenRef` drops a run the user abandoned.
+  const handleSearch = useCallback(
+    async (query: string) => {
+      const needle = query.trim().toLowerCase();
+      if (!needle || !pdf) return false;
 
-    const match = READER_PAGES.find((page) =>
-      page.paragraphs.join(" ").toLowerCase().includes(needle),
-    );
-    if (!match) return false;
+      const token = searchTokenRef.current + 1;
+      searchTokenRef.current = token;
 
-    scrollToPage(match.page);
-    return true;
-  };
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        let text = textCacheRef.current.get(pageNumber);
+        if (text === undefined) {
+          try {
+            const page = await pdf.getPage(pageNumber);
+            const content = await page.getTextContent();
+            text = content.items
+              .map((item) => ("str" in item ? item.str : " "))
+              .join(" ")
+              .toLowerCase();
+          } catch {
+            text = "";
+          }
+          textCacheRef.current.set(pageNumber, text);
+        }
+
+        if (token !== searchTokenRef.current) return false;
+
+        if (text.includes(needle)) {
+          scrollToPage(pageNumber);
+          return true;
+        }
+      }
+
+      return false;
+    },
+    [pdf, scrollToPage],
+  );
 
   const handleDictionary = () => {
     console.log("Dictionary", selectionMenu?.text);
@@ -390,7 +530,6 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   };
 
   const palette = READER_PALETTES[theme];
-  const zoomScale = zoom / 100;
   const variables = {
     "--r-bg": palette.bg,
     "--r-surface": palette.surface,
@@ -404,14 +543,13 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   return (
     <div
       style={variables}
+      data-reader-theme={theme}
       className="fixed inset-0 z-[200] flex flex-col bg-[var(--r-bg)] text-[var(--r-ink)]"
     >
       <ReaderToolbar
         title={book.title}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
-        fontSize={fontSize}
-        onFontSizeChange={setFontSize}
         theme={theme}
         onThemeChange={setTheme}
         zoom={zoom}
@@ -431,6 +569,11 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
             annotations={sortedAnnotations}
             annotationsLoading={annotationsLoading}
             onSelectAnnotation={scrollToAnnotation}
+            pdf={pdf}
+            numPages={numPages}
+            pageAspect={pageAspect}
+            outline={outline}
+            outlineLoading={outlineLoading}
           />
         )}
 
@@ -438,70 +581,115 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
           ref={scrollRef}
           onScroll={updateCurrentPage}
           onMouseUp={captureSelection}
-          className="min-w-0 flex-1 overflow-y-auto"
+          className="min-w-0 flex-1 overflow-auto"
         >
-          {/* The layer is narrowed as it scales so the page keeps the viewport
-              width and only grows vertically, leaving the scrollbar accurate. */}
-          <div
-            className="mx-auto"
-            style={{
-              width: `${100 / zoomScale}%`,
-              transform: `scale(${zoomScale})`,
-              transformOrigin: "top center",
-            }}
-          >
-            <div className="mx-auto flex w-full max-w-[46rem] flex-col gap-6 px-6 py-8">
-              {READER_PAGES.map((page, index) => (
-                <article
-                  key={page.page}
-                  data-page={page.page}
-                  ref={(element) => {
-                    pageRefs.current[index] = element;
-                  }}
-                  className="rounded-sm bg-[var(--r-page)] px-[clamp(1.75rem,5vw,4rem)] py-[clamp(2.25rem,4vw,3.25rem)] shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
-                >
-                  {page.heading && (
-                    <h2 className="mb-5 text-center font-serif text-[11px] uppercase tracking-[0.22em] text-[var(--r-muted)]">
-                      {page.heading}
-                    </h2>
-                  )}
+          {unavailable ? (
+            <UnavailableBook message={unavailable} title={book.title} onBack={onClose} />
+          ) : !assetUrl ? (
+            <Busy label="Finding the file…" />
+          ) : (
+            <Document
+              key={assetUrl}
+              file={assetUrl}
+              suspense={false}
+              onLoadSuccess={handleDocumentLoad}
+              onLoadError={(error) =>
+                setUnavailable(errorMessage(error, "The PDF could not be read."))
+              }
+              loading={<Busy label={`Opening “${book.title}”…`} />}
+              error={
+                <UnavailableBook
+                  message="The PDF is damaged, password protected, or not really a PDF."
+                  title={book.title}
+                  onBack={onClose}
+                />
+              }
+              className="mx-auto flex w-max flex-col items-center gap-6 px-6 py-8"
+            >
+              {pageNumbers.map((pageNumber) => {
+                const isRendered =
+                  Boolean(pdf) && Math.abs(pageNumber - currentPage) <= RENDER_WINDOW;
 
-                  <div className="relative" data-annotation-content>
-                    <div
-                      className="space-y-5 text-justify font-serif leading-relaxed hyphens-auto"
-                      style={{ fontSize }}
-                    >
-                      {page.paragraphs.map((paragraph) => (
-                        <p key={paragraph.slice(0, 40)}>{paragraph}</p>
-                      ))}
-                    </div>
+                return (
+                  <article
+                    key={pageNumber}
+                    data-page={pageNumber}
+                    ref={(element) => {
+                      pageRefs.current[pageNumber - 1] = element;
+                    }}
+                    style={{ width: pageWidth, minHeight: pageHeight }}
+                    className="relative shrink-0 rounded-sm bg-[var(--r-page)] shadow-[0_1px_4px_rgba(0,0,0,0.14)]"
+                  >
+                    {isRendered && pdf ? (
+                      <div data-annotation-content className="relative">
+                        <Page
+                          pdf={pdf}
+                          pageNumber={pageNumber}
+                          scale={zoomScale}
+                          renderTextLayer
+                          renderAnnotationLayer
+                          loading={
+                            <div
+                              style={{ width: pageWidth, height: pageHeight }}
+                              className="grid place-items-center bg-[var(--r-page)]"
+                            >
+                              <Loader2
+                                size={18}
+                                className="animate-spin text-[var(--r-muted)]"
+                              />
+                            </div>
+                          }
+                          error={
+                            <div
+                              style={{ width: pageWidth, minHeight: 160 }}
+                              className="grid place-items-center px-6 py-10 text-center text-[11.5px] text-[var(--r-muted)]"
+                            >
+                              Page {pageNumber} could not be drawn.
+                            </div>
+                          }
+                        />
 
-                    <AnnotationOverlay
-                      annotations={annotationsByPage.get(page.page) ?? EMPTY_ANNOTATIONS}
-                      focusedId={focusedAnnotationId}
-                      layoutKey={`${zoom}:${fontSize}`}
-                      pending={
-                        noteDraft && noteDraft.selection.pageNumber === page.page
-                          ? {
-                              text: noteDraft.selection.text,
-                              rects: noteDraft.selection.rects,
-                              color: noteDraft.color,
-                            }
-                          : null
-                      }
-                      onOpen={handleOpenAnnotation}
-                    />
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
+                        <AnnotationOverlay
+                          annotations={
+                            annotationsByPage.get(pageNumber) ?? EMPTY_ANNOTATIONS
+                          }
+                          focusedId={focusedAnnotationId}
+                          layoutKey={`${zoom}:${pageWidth}`}
+                          pending={
+                            noteDraft && noteDraft.selection.pageNumber === pageNumber
+                              ? {
+                                  text: noteDraft.selection.text,
+                                  rects: noteDraft.selection.rects,
+                                  color: noteDraft.color,
+                                }
+                              : null
+                          }
+                          onOpen={handleOpenAnnotation}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        style={{ height: pageHeight }}
+                        className="grid place-items-center bg-[var(--r-page)]"
+                      >
+                        <span className="text-[11px] tabular-nums text-[var(--r-muted)] opacity-60">
+                          {pageNumber}
+                        </span>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </Document>
+          )}
         </main>
       </div>
 
       <footer className="shrink-0 border-t border-[var(--r-border)] bg-[var(--r-surface)] px-4 pb-2 pt-1.5">
         <p className="text-center text-[11px] tracking-wide text-[var(--r-muted)]">
-          Page {currentPage} of {totalPages} ( {percent}% )
+          {totalPages > 0
+            ? `Page ${currentPage} of ${totalPages} ( ${percent}% )`
+            : "Preparing pages…"}
         </p>
       </footer>
 
@@ -571,6 +759,45 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function Busy({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-8 py-28 text-[var(--r-muted)]">
+      <Loader2 size={22} className="animate-spin" />
+      <p className="text-[12px]">{label}</p>
+    </div>
+  );
+}
+
+function UnavailableBook({
+  message,
+  title,
+  onBack,
+}: {
+  message: string;
+  title: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-8 py-24 text-center">
+      <FileWarning size={30} className="text-red-500" />
+      <h2 className="text-[14px] font-medium text-[var(--r-ink)]">
+        This book cannot be opened
+      </h2>
+      <p className="text-[11.5px] leading-relaxed text-[var(--r-muted)]">
+        <span className="font-medium text-[var(--r-ink)]">“{title}”</span> — {message}
+      </p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-[var(--r-border)] px-3 py-1.5 text-[11.5px] text-[var(--r-ink)] transition-colors hover:bg-[var(--r-tint)]"
+      >
+        <ArrowLeft size={13} />
+        Back to library
+      </button>
     </div>
   );
 }

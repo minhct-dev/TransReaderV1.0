@@ -21,6 +21,7 @@ pub fn run() {
             commands::book::get_all_books,
             commands::book::add_book,
             commands::book::delete_book,
+            commands::book::resolve_book_path,
             commands::book_annotation::add_annotation,
             commands::book_annotation::get_annotations_by_book,
             commands::book_annotation::get_annotations_by_page,

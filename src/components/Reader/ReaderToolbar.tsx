@@ -18,8 +18,6 @@ interface ReaderToolbarProps {
   title: string;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
-  fontSize: number;
-  onFontSizeChange: (size: number) => void;
   theme: ReaderTheme;
   onThemeChange: (theme: ReaderTheme) => void;
   /** Page zoom, in percent. */
@@ -27,8 +25,8 @@ interface ReaderToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
-  /** Returns false when nothing in the book matches. */
-  onSearch: (query: string) => boolean;
+  /** Resolves false when nothing in the book matches. */
+  onSearch: (query: string) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -40,15 +38,10 @@ const THEME_OPTIONS: { id: ReaderTheme; label: string; icon: typeof Sun }[] = [
   { id: "dark", label: "Dark", icon: Moon },
 ];
 
-const MIN_FONT = 14;
-const MAX_FONT = 28;
-
 export default function ReaderToolbar({
   title,
   isSidebarOpen,
   onToggleSidebar,
-  fontSize,
-  onFontSizeChange,
   theme,
   onThemeChange,
   zoom,
@@ -62,6 +55,7 @@ export default function ReaderToolbar({
   const [bookmarked, setBookmarked] = useState(false);
   const [query, setQuery] = useState("");
   const [noMatch, setNoMatch] = useState(false);
+  const [searching, setSearching] = useState(false);
   const clusterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,14 +82,21 @@ export default function ReaderToolbar({
     setNoMatch(false);
   };
 
-  const handleSearchSubmit = (event: React.FormEvent) => {
+  const handleSearchSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (onSearch(query)) {
-      setPanel(null);
-      setQuery("");
-      setNoMatch(false);
-    } else {
-      setNoMatch(true);
+    if (searching) return;
+
+    setSearching(true);
+    setNoMatch(false);
+    try {
+      if (await onSearch(query)) {
+        setPanel(null);
+        setQuery("");
+      } else {
+        setNoMatch(true);
+      }
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -131,23 +132,28 @@ export default function ReaderToolbar({
 
         {panel === "text" && (
           <div className="absolute left-0 top-[calc(100%+8px)] w-[232px] rounded-xl border border-[var(--r-border)] bg-[var(--r-surface)] p-3 shadow-xl">
-            <PanelLabel>Text size</PanelLabel>
+            <PanelLabel>Zoom</PanelLabel>
             <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--r-border)] px-1 py-0.5">
               <button
                 type="button"
-                aria-label="Smaller text"
-                onClick={() => onFontSizeChange(Math.max(MIN_FONT, fontSize - 1))}
+                aria-label="Zoom out"
+                onClick={onZoomOut}
                 className="grid size-7 place-items-center rounded text-[var(--r-ink)] transition-colors hover:bg-[var(--r-tint)]"
               >
                 <Minus size={14} />
               </button>
-              <span className="text-[13px] font-medium tabular-nums text-[var(--r-ink)]">
-                {fontSize}px
-              </span>
               <button
                 type="button"
-                aria-label="Larger text"
-                onClick={() => onFontSizeChange(Math.min(MAX_FONT, fontSize + 1))}
+                onClick={onZoomReset}
+                title={`Reset zoom to ${DEFAULT_ZOOM}%`}
+                className="rounded px-1 text-[13px] font-medium tabular-nums text-[var(--r-ink)] transition-colors hover:bg-[var(--r-tint)]"
+              >
+                {zoom}%
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom in"
+                onClick={onZoomIn}
                 className="grid size-7 place-items-center rounded text-[var(--r-ink)] transition-colors hover:bg-[var(--r-tint)]"
               >
                 <Plus size={14} />
@@ -202,7 +208,11 @@ export default function ReaderToolbar({
               className="w-full rounded-lg border border-[var(--r-border)] bg-transparent px-2.5 py-1.5 text-[12px] text-[var(--r-ink)] outline-none placeholder:text-[var(--r-muted)] focus:border-blue-400"
             />
             <p className="mt-1.5 px-1 text-[10px] text-[var(--r-muted)]">
-              {noMatch ? "No page contains that text." : "Press Enter to jump to the first match."}
+              {searching
+                ? "Searching the pages…"
+                : noMatch
+                  ? "No page contains that text."
+                  : "Press Enter to jump to the first match."}
             </p>
           </form>
         )}

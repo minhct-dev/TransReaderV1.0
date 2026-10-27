@@ -136,6 +136,23 @@ pub fn delete_book(db: &Db, book_id: &str) -> Result<(), String> {
 pub fn get_books(db: &Db) -> Result<Vec<Book>, String> {
     get_books_conn(&db.conn())
 }
+
+/// Absolute path of a book that is still in the library.
+pub fn book_path(db: &Db, book_id: &str) -> Result<String, String> {
+    book_path_conn(&db.conn(), book_id)
+}
+
+fn book_path_conn(conn: &Connection, book_id: &str) -> Result<String, String> {
+    conn.query_row(
+        "SELECT file_path FROM books WHERE id = ?1 AND is_deleted = 0",
+        params![book_id],
+        |row| row.get(0),
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => format!("No book found with id {book_id}"),
+        other => format!("Cannot read book path: {other}"),
+    })
+}
 /// Bring a previously removed book back when the same file is imported again,
 /// so its progress and metadata survive the round trip.
 ///
@@ -484,6 +501,25 @@ mod tests {
             revive_conn(&conn, &Some("UNKNOWN".into()), "C:/books/x.pdf")
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn book_path_resolves_only_live_books() {
+        let conn = seeded();
+        let book = sample(r"C:\Users\me\Documents\a.pdf");
+        insert_conn(&conn, &book).unwrap();
+
+        assert_eq!(
+            book_path_conn(&conn, &book.id).unwrap(),
+            r"C:\Users\me\Documents\a.pdf"
+        );
+        assert!(book_path_conn(&conn, "missing-id").is_err());
+
+        delete_conn(&conn, &book.id).unwrap();
+        assert!(
+            book_path_conn(&conn, &book.id).is_err(),
+            "a removed book must not hand out its path"
         );
     }
 }
