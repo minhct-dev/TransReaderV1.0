@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Book, BookDto } from "../types/book";
 import type { BookAnnotation } from "../types/annotation";
+import type { DictionaryEntry } from "../types/dictionary";
 
 function mapBookDtoToBook(dto: BookDto): Book {
   const cover = dto.cover_url ?? null;
@@ -69,3 +70,13 @@ export async function updateAnnotationNote(
 export async function deleteAnnotation(annotationId: string): Promise<void> {
   await invoke<void>("delete_annotation", { annotationId });
 }
+
+/**
+ * Look a single word up in the Rust dictionary cache, then the free dictionary
+ * API. Resolves with every entry the API returned; the first one is the usual
+ * display candidate.
+ */
+export async function lookupDictionary(word: string): Promise<DictionaryEntry[]> {
+  return invoke<DictionaryEntry[]>("lookup_dictionary", { word });
+}
+

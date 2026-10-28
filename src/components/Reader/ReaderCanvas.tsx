@@ -10,6 +10,9 @@ import SelectionPopover from "./SelectionPopover";
 import AnnotationOverlay from "./AnnotationOverlay";
 import AnnotationPopover from "./AnnotationPopover";
 import NoteComposer from "./NoteComposer";
+import DictionaryPopover from "./DictionaryPopover";
+import { useTextSelection } from "./useTextSelection";
+import type { TextSelection } from "./useTextSelection";
 import { loadOutline } from "./readerOutline";
 import type { TocEntry } from "./readerOutline";
 import { READER_PALETTES } from "./readerTheme";
@@ -45,6 +48,7 @@ interface SelectionMenu {
   rects: AnnotationRect[];
   x: number;
   y: number;
+  isSingleWord: boolean;
 }
 
 interface NoteDraft {
@@ -56,6 +60,13 @@ interface ActiveAnnotation {
   annotation: BookAnnotation;
   x: number;
   y: number;
+}
+
+interface DictionaryTarget {
+  word: string;
+  x: number;
+  y: number;
+  singleWord: boolean;
 }
 
 const EMPTY_ANNOTATIONS: BookAnnotation[] = [];
@@ -79,6 +90,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   const [annotationsLoading, setAnnotationsLoading] = useState(true);
   const [activeAnnotation, setActiveAnnotation] = useState<ActiveAnnotation | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
+  const [dictionaryTarget, setDictionaryTarget] = useState<DictionaryTarget | null>(null);
   const [focusedAnnotationId, setFocusedAnnotationId] = useState<string | null>(null);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
 
@@ -134,6 +146,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     setActiveAnnotation(null);
     setNoteDraft(null);
     setSelectionMenu(null);
+    setDictionaryTarget(null);
     textCacheRef.current.clear();
     zoomTouchedRef.current = false;
 
@@ -251,6 +264,18 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     };
   }, [selectionMenu, closeSelectionMenu]);
 
+  useEffect(() => {
+    if (!dictionaryTarget) return;
+
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const closeDictionary = () => setDictionaryTarget(null);
+    element.addEventListener("scroll", closeDictionary);
+
+    return () => element.removeEventListener("scroll", closeDictionary);
+  }, [dictionaryTarget]);
+
   const scrollToPage = useCallback((page: number) => {
     const root = scrollRef.current;
     const target = pageRefs.current[page - 1];
@@ -319,6 +344,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   useEffect(() => {
     closeSelectionMenu();
     setActiveAnnotation(null);
+    setDictionaryTarget(null);
     updateCurrentPage();
   }, [zoom, closeSelectionMenu, updateCurrentPage]);
 
@@ -357,17 +383,9 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     }
   }, [pageSize, numPages]);
 
-  const captureSelection = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
-
-    const text = selection.toString().trim();
-    if (!text) return;
-
-    const range = selection.getRangeAt(0);
+  const handleTextSelected = useCallback((selection: TextSelection, range: Range) => {
     const startNode = range.startContainer;
-    const startElement =
-      startNode instanceof Element ? startNode : startNode.parentElement;
+    const startElement = startNode instanceof Element ? startNode : startNode.parentElement;
     const content = startElement?.closest<HTMLElement>("[data-annotation-content]");
     if (!content) return;
 
@@ -378,16 +396,22 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     const rects = rectsFromRange(range, content);
     if (rects.length === 0) return;
 
-    const firstRect = range.getClientRects()[0] ?? range.getBoundingClientRect();
     setSelectionMenu({
       pageNumber,
-      text,
+      text: selection.text,
       rects,
-      x: firstRect.left,
-      y: firstRect.top,
+      x: selection.x,
+      y: selection.y,
+      isSingleWord: selection.isSingleWord,
     });
     setActiveAnnotation(null);
   }, []);
+
+  useTextSelection({
+    containerRef: scrollRef,
+    onSelect: handleTextSelected,
+    onClear: closeSelectionMenu,
+  });
 
   const createAnnotation = useCallback(
     async (selection: SelectionMenu, color: string, noteText: string | null) => {
@@ -520,8 +544,16 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   );
 
   const handleDictionary = () => {
-    console.log("Dictionary", selectionMenu?.text);
+    if (!selectionMenu) return;
+
+    setDictionaryTarget({
+      word: selectionMenu.text,
+      x: selectionMenu.x,
+      y: selectionMenu.y,
+      singleWord: selectionMenu.isSingleWord,
+    });
     closeSelectionMenu();
+    window.getSelection()?.removeAllRanges();
   };
 
   const handleShare = () => {
@@ -580,7 +612,6 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
         <main
           ref={scrollRef}
           onScroll={updateCurrentPage}
-          onMouseUp={captureSelection}
           className="min-w-0 flex-1 overflow-auto"
         >
           {unavailable ? (
@@ -713,6 +744,17 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
           onAddNote={handleAddNote}
           onDictionary={handleDictionary}
           onShare={handleShare}
+        />
+      )}
+
+      {dictionaryTarget && (
+        <DictionaryPopover
+          key={`${dictionaryTarget.word}:${dictionaryTarget.x}:${dictionaryTarget.y}`}
+          word={dictionaryTarget.word}
+          x={dictionaryTarget.x}
+          y={dictionaryTarget.y}
+          singleWord={dictionaryTarget.singleWord}
+          onClose={() => setDictionaryTarget(null)}
         />
       )}
 
