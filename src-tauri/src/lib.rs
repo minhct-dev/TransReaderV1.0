@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod api;
 mod commands;
 mod models;
 mod storage;
@@ -26,7 +27,8 @@ pub fn run() {
             commands::book_annotation::get_annotations_by_book,
             commands::book_annotation::get_annotations_by_page,
             commands::book_annotation::update_annotation_note,
-            commands::book_annotation::delete_annotation
+            commands::book_annotation::delete_annotation,
+            commands::dictionary::lookup_dictionary
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -36,6 +36,12 @@ CREATE TABLE IF NOT EXISTS book_annotations (
     updated_at    TEXT    NOT NULL,
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS dictionary_cache (
+    id            TEXT    PRIMARY KEY NOT NULL,
+    word          TEXT    NOT NULL UNIQUE,
+    data_json    TEXT    NOT NULL,
+    last_accessed_at    TEXT    NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_annotations_book_page
     ON book_annotations (book_id, page_number);
 
@@ -118,6 +124,24 @@ fn apply_schema(conn: &Connection) -> Result<(), String> {
         conn.execute("ALTER TABLE books ADD COLUMN file_id TEXT", [])
             .map_err(|e| format!("Cannot add books.file_id: {e}"))?;
     }
+
+    // Older builds created dictionary_cache without a unique word column, so
+    // the upsert in `storage::dictionary_cache` needs this index. Keep only the
+    // newest row per word before creating it.
+    conn.execute(
+        "DELETE FROM dictionary_cache
+          WHERE rowid NOT IN (
+                SELECT MAX(rowid) FROM dictionary_cache GROUP BY word
+          )",
+        [],
+    )
+    .map_err(|e| format!("Cannot clean dictionary cache: {e}"))?;
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_cache_word
+            ON dictionary_cache (word)",
+        [],
+    )
+    .map_err(|e| format!("Cannot index dictionary cache: {e}"))?;
 
     Ok(())
 }
