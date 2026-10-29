@@ -5,6 +5,7 @@ use rusqlite::{Connection, ErrorCode, params};
 use tauri::{AppHandle, Manager};
 
 use crate::models::book::Book;
+use crate::utils::error::AppError;
 
 const SCHEMA: &str = r#"
 PRAGMA journal_mode = WAL;
@@ -74,20 +75,20 @@ impl Db {
 }
 
 /// `%APPDATA%\com.minhct.transreader\reader.db` on Windows (or the OS equivalent).
-pub fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Cannot create {}: {e}", dir.display()))?;
+pub fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app.path().app_data_dir().map_err(|e| {
+        AppError::internal(format!("Cannot resolve the app data directory: {e}"))
+    })?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| AppError::internal(format!("Cannot create {}: {e}", dir.display())))?;
     Ok(dir.join("reader.db"))
 }
 
 /// Open (creating if needed) the database, apply the schema and any migration.
-pub fn init(app: &AppHandle) -> Result<Db, String> {
+pub fn init(app: &AppHandle) -> Result<Db, AppError> {
     let path = db_path(app)?;
-    let conn =
-        Connection::open(&path).map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
+    let conn = Connection::open(&path)
+        .map_err(|e| AppError::database_error(format!("Cannot open {}: {e}", path.display())))?;
     apply_schema(&conn)?;
 
     let db = Db::new(conn);
@@ -106,9 +107,9 @@ pub(crate) fn test_db() -> Db {
 
 /// An existing reader.db is not changed by `CREATE TABLE IF NOT EXISTS`, so
 /// columns added after the first release need an explicit ALTER TABLE.
-fn apply_schema(conn: &Connection) -> Result<(), String> {
+fn apply_schema(conn: &Connection) -> Result<(), AppError> {
     conn.execute_batch(SCHEMA)
-        .map_err(|e| format!("Cannot initialise schema: {e}"))?;
+        .map_err(|e| AppError::database_error(format!("Cannot initialise the schema: {e}")))?;
 
     let has_file_id = conn
         .prepare("PRAGMA table_info(books)")
@@ -116,13 +117,13 @@ fn apply_schema(conn: &Connection) -> Result<(), String> {
             stmt.query_map([], |row| row.get::<_, String>(1))?
                 .collect::<rusqlite::Result<Vec<String>>>()
         })
-        .map_err(|e| format!("Cannot inspect books table: {e}"))?
+        .map_err(|e| AppError::database_error(format!("Cannot inspect the books table: {e}")))?
         .iter()
         .any(|column| column == "file_id");
 
     if !has_file_id {
         conn.execute("ALTER TABLE books ADD COLUMN file_id TEXT", [])
-            .map_err(|e| format!("Cannot add books.file_id: {e}"))?;
+            .map_err(|e| AppError::database_error(format!("Cannot add books.file_id: {e}")))?;
     }
 
     // Older builds created dictionary_cache without a unique word column, so
@@ -135,46 +136,46 @@ fn apply_schema(conn: &Connection) -> Result<(), String> {
           )",
         [],
     )
-    .map_err(|e| format!("Cannot clean dictionary cache: {e}"))?;
+    .map_err(|e| AppError::database_error(format!("Cannot clean the dictionary cache: {e}")))?;
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_dictionary_cache_word
             ON dictionary_cache (word)",
         [],
     )
-    .map_err(|e| format!("Cannot index dictionary cache: {e}"))?;
+    .map_err(|e| AppError::database_error(format!("Cannot index the dictionary cache: {e}")))?;
 
     Ok(())
 }
 
 /// Insert a book. Returns `false` when an active book already uses that file path.
-pub fn insert_book(db: &Db, book: &Book) -> Result<bool, String> {
+pub fn insert_book(db: &Db, book: &Book) -> Result<bool, AppError> {
     insert_conn(&db.conn(), book)
 }
 
 /// Soft-delete a book: hide it from the library, keep the row and the file on disk.
-pub fn delete_book(db: &Db, book_id: &str) -> Result<(), String> {
+pub fn delete_book(db: &Db, book_id: &str) -> Result<(), AppError> {
     delete_conn(&db.conn(), book_id)
 }
 
 /// All non-deleted books, newest first.
-pub fn get_books(db: &Db) -> Result<Vec<Book>, String> {
+pub fn get_books(db: &Db) -> Result<Vec<Book>, AppError> {
     get_books_conn(&db.conn())
 }
 
 /// Absolute path of a book that is still in the library.
-pub fn book_path(db: &Db, book_id: &str) -> Result<String, String> {
+pub fn book_path(db: &Db, book_id: &str) -> Result<String, AppError> {
     book_path_conn(&db.conn(), book_id)
 }
 
-fn book_path_conn(conn: &Connection, book_id: &str) -> Result<String, String> {
+fn book_path_conn(conn: &Connection, book_id: &str) -> Result<String, AppError> {
     conn.query_row(
         "SELECT file_path FROM books WHERE id = ?1 AND is_deleted = 0",
         params![book_id],
         |row| row.get(0),
     )
     .map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => format!("No book found with id {book_id}"),
-        other => format!("Cannot read book path: {other}"),
+        rusqlite::Error::QueryReturnedNoRows => AppError::book_not_found(),
+        other => AppError::database_error(format!("Cannot read the path of book {book_id}: {other}")),
     })
 }
 /// Bring a previously removed book back when the same file is imported again,
@@ -187,7 +188,7 @@ pub fn revive_book(
     db: &Db,
     file_id: &Option<String>,
     file_path: &str,
-) -> Result<Option<Book>, String> {
+) -> Result<Option<Book>, AppError> {
     revive_conn(&db.conn(), file_id, file_path)
 }
 
@@ -195,7 +196,7 @@ fn revive_conn(
     conn: &Connection,
     file_id: &Option<String>,
     file_path: &str,
-) -> Result<Option<Book>, String> {
+) -> Result<Option<Book>, AppError> {
     // Only revive when the picked path is free. Flipping `is_deleted` while an
     // active row already owns that path trips the partial unique index.
     conn.execute(
@@ -212,7 +213,7 @@ fn revive_conn(
           )",
         params![file_id, file_path, chrono::Utc::now().to_rfc3339()],
     )
-    .map_err(|e| format!("Cannot restore book: {e}"))?;
+    .map_err(|e| AppError::database_error(format!("Cannot restore the book: {e}")))?;
 
     let sql = format!(
         "SELECT {COLS} FROM books
@@ -220,18 +221,22 @@ fn revive_conn(
           ORDER BY created_at DESC
           LIMIT 1"
     );
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|e| AppError::database_error(format!("Cannot look up the book: {e}")))?;
     let mut rows = stmt
         .query_map(params![file_id, file_path], row_to_book)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::database_error(format!("Cannot look up the book: {e}")))?;
 
     match rows.next() {
         Some(Ok(book)) => Ok(Some(book)),
-        Some(Err(e)) => Err(format!("Cannot read restored book: {e}")),
+        Some(Err(e)) => Err(AppError::database_error(format!(
+            "Cannot read the restored book: {e}"
+        ))),
         None => Ok(None),
     }
 }
-fn insert_conn(conn: &Connection, book: &Book) -> Result<bool, String> {
+fn insert_conn(conn: &Connection, book: &Book) -> Result<bool, AppError> {
     let result = conn.execute(
         INSERT_SQL,
         params![
@@ -254,30 +259,36 @@ fn insert_conn(conn: &Connection, book: &Book) -> Result<bool, String> {
         Err(rusqlite::Error::SqliteFailure(e, _)) if e.code == ErrorCode::ConstraintViolation => {
             Ok(false)
         }
-        Err(e) => Err(format!("Cannot insert book: {e}")),
+        Err(e) => Err(AppError::database_error(format!("Cannot insert the book: {e}"))),
     }
 }
 
-fn delete_conn(conn: &Connection, book_id: &str) -> Result<(), String> {
+fn delete_conn(conn: &Connection, book_id: &str) -> Result<(), AppError> {
     let result = conn.execute(
         "UPDATE books SET is_deleted = 1 WHERE id = ?1 AND is_deleted = 0",
         params![book_id],
     );
 
     match result {
-        Ok(0) => Err(format!("No active book found with id {book_id}")),
+        Ok(0) => Err(AppError::book_not_found()),
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot delete book {book_id}: {e}")),
+        Err(e) => Err(AppError::database_error(format!(
+            "Cannot delete book {book_id}: {e}"
+        ))),
     }
 }
 
-fn get_books_conn(conn: &Connection) -> Result<Vec<Book>, String> {
+fn get_books_conn(conn: &Connection) -> Result<Vec<Book>, AppError> {
     let sql = format!("SELECT {COLS} FROM books WHERE is_deleted = 0 ORDER BY created_at DESC");
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([], row_to_book).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|e| AppError::database_error(format!("Cannot read the library: {e}")))?;
+    let rows = stmt
+        .query_map([], row_to_book)
+        .map_err(|e| AppError::database_error(format!("Cannot read the library: {e}")))?;
 
     rows.collect::<rusqlite::Result<Vec<Book>>>()
-        .map_err(|e| format!("Cannot read books: {e}"))
+        .map_err(|e| AppError::database_error(format!("Cannot read the library: {e}")))
 }
 
 fn row_to_book(row: &rusqlite::Row<'_>) -> rusqlite::Result<Book> {

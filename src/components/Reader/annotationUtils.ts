@@ -259,6 +259,13 @@ export function sortAnnotations(annotations: BookAnnotation[]): BookAnnotation[]
 }
 
 export function errorMessage(error: unknown, fallback: string): string {
+  // Every Tauri command rejects with the Rust `AppError` shape.
+  if (error && typeof error === "object") {
+    const { code, message } = error as Partial<{ code: string; message: string }>;
+    if (typeof code === "string" && typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
   if (typeof error === "string" && error.trim()) return error;
   if (error instanceof Error && error.message.trim()) return error.message;
   return fallback;

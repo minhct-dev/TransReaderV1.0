@@ -2,42 +2,57 @@ use std::time::Duration;
 
 use reqwest::Client;
 
+use crate::utils::error::AppError;
+
+// const GOOGLE_TRANSLATE_ENDPOINT: &str = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_language}&dt=t&q={word}";
 const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
 const TIMEOUT_SECS: u64 = 10;
 
 /// Fetch the raw JSON array the free dictionary API returns for `word`.
-pub async fn get_dictionary_data_by_word(word: &str) -> Result<String, String> {
+pub async fn get_dictionary_data_by_word(word: &str) -> Result<String, AppError> {
     if word.is_empty() {
-        return Err("Word cannot be empty".to_string());
+        return Err(AppError::invalid_input("Please select a single word."));
     }
 
     let client = Client::builder()
         .timeout(Duration::from_secs(TIMEOUT_SECS))
         .user_agent("TransReader/0.1 (+https://github.com/minhct/transreader)")
         .build()
-        .map_err(|e| format!("Cannot build HTTP client: {e}"))?;
+        .map_err(|e| {
+            AppError::failed_to_build_http_client(format!("Cannot build the HTTP client: {e}"))
+        })?;
 
     let response = client
         .get(format!("{ENDPOINT}/{word}"))
         .send()
         .await
-        .map_err(|e| format!("HTTP request failed: {e}"))?;
+        .map_err(|e| AppError::http_request_failed(format!("The dictionary is unreachable: {e}")))?;
 
     match response.status() {
         reqwest::StatusCode::OK => {
-            let body = response
-                .text()
-                .await
-                .map_err(|e| format!("Failed to read response body: {e}"))?;
+            let body = response.text().await.map_err(|e| {
+                AppError::http_request_failed(format!(
+                    "The dictionary response was cut short: {e}"
+                ))
+            })?;
 
-            serde_json::from_str::<serde_json::Value>(&body)
-                .map_err(|e| format!("Dictionary service returned invalid JSON: {e}"))?;
+            serde_json::from_str::<serde_json::Value>(&body).map_err(|e| {
+                AppError::invalid_response(format!("The dictionary returned invalid JSON: {e}"))
+            })?;
 
             Ok(body)
         }
-        reqwest::StatusCode::NOT_FOUND => {
-            Err(format!("Word '{word}' was not found in the dictionary."))
-        }
-        status => Err(format!("Dictionary service returned {status}.")),
+        reqwest::StatusCode::NOT_FOUND => Err(AppError::word_not_found(word)),
+        status => Err(AppError::http_request_failed(format!(
+            "The dictionary answered with {status}."
+        ))),
     }
 }
+
+// pub async fn translate_with_google(word: &str, target_language: &str) -> Result<String, String> {
+//     // Implementation for Google Translate API
+
+
+//     return '';
+
+// }

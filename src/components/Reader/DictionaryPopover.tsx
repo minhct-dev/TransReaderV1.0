@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Bookmark, BookmarkCheck, ExternalLink, Volume2, X } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { lookupDictionary } from "../../services/tauriBridge";
+import { errorMessage } from "./annotationUtils";
 import type { DictionaryEntry } from "../../types/dictionary";
 
 interface DictionaryPopoverProps {
@@ -63,8 +64,10 @@ export default function DictionaryPopover({
         }
         setState({ status: "ready", entry: entries[0] });
       })
-      .catch(() => {
-        if (!cancelled) setState({ status: "error", message: NOT_FOUND_MESSAGE });
+      .catch((error) => {
+        if (!cancelled) {
+          setState({ status: "error", message: errorMessage(error, NOT_FOUND_MESSAGE) });
+        }
       });
 
     return () => {

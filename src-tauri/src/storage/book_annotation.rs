@@ -2,6 +2,7 @@ use rusqlite::{Connection, params};
 
 use crate::models::book_annotation::BookAnnotation;
 use crate::storage::db::Db;
+use crate::utils::error::AppError;
 
 const COLS: &str =
     "id, book_id, page_number, selected_text, color, note_text, rects_json, created_at, updated_at";
@@ -11,12 +12,12 @@ const INSERT_SQL: &str = "INSERT INTO book_annotations
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
 
 /// Store a new highlight or note.
-pub fn add_annotation(db: &Db, annotation: &BookAnnotation) -> Result<(), String> {
+pub fn add_annotation(db: &Db, annotation: &BookAnnotation) -> Result<(), AppError> {
     add_annotation_conn(&db.conn(), annotation)
 }
 
 /// Every annotation of a book, ordered by page and then creation time.
-pub fn get_annotations_by_book(db: &Db, book_id: &str) -> Result<Vec<BookAnnotation>, String> {
+pub fn get_annotations_by_book(db: &Db, book_id: &str) -> Result<Vec<BookAnnotation>, AppError> {
     get_annotations_by_book_conn(&db.conn(), book_id)
 }
 
@@ -25,7 +26,7 @@ pub fn get_annotations_by_page(
     db: &Db,
     book_id: &str,
     page_number: i64,
-) -> Result<Vec<BookAnnotation>, String> {
+) -> Result<Vec<BookAnnotation>, AppError> {
     get_annotations_by_page_conn(&db.conn(), book_id, page_number)
 }
 
@@ -34,16 +35,16 @@ pub fn update_annotation_note(
     db: &Db,
     annotation_id: &str,
     note_text: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     update_annotation_note_conn(&db.conn(), annotation_id, note_text.as_deref())
 }
 
 /// Remove an annotation permanently.
-pub fn delete_annotation(db: &Db, annotation_id: &str) -> Result<(), String> {
+pub fn delete_annotation(db: &Db, annotation_id: &str) -> Result<(), AppError> {
     delete_annotation_conn(&db.conn(), annotation_id)
 }
 
-fn add_annotation_conn(conn: &Connection, annotation: &BookAnnotation) -> Result<(), String> {
+fn add_annotation_conn(conn: &Connection, annotation: &BookAnnotation) -> Result<(), AppError> {
     conn.execute(
         INSERT_SQL,
         params![
@@ -59,13 +60,13 @@ fn add_annotation_conn(conn: &Connection, annotation: &BookAnnotation) -> Result
         ],
     )
     .map(|_| ())
-    .map_err(|e| format!("Cannot add annotation {}: {e}", annotation.id))
+    .map_err(|e| AppError::database_error(format!("Cannot add annotation {}: {e}", annotation.id)))
 }
 
 fn get_annotations_by_book_conn(
     conn: &Connection,
     book_id: &str,
-) -> Result<Vec<BookAnnotation>, String> {
+) -> Result<Vec<BookAnnotation>, AppError> {
     let sql = format!(
         "SELECT {COLS} FROM book_annotations
           WHERE book_id = ?1
@@ -73,20 +74,20 @@ fn get_annotations_by_book_conn(
     );
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("Cannot read annotations: {e}"))?;
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))?;
     let rows = stmt
         .query_map(params![book_id], row_to_annotation)
-        .map_err(|e| format!("Cannot read annotations: {e}"))?;
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))?;
 
     rows.collect::<rusqlite::Result<Vec<BookAnnotation>>>()
-        .map_err(|e| format!("Cannot read annotations: {e}"))
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))
 }
 
 fn get_annotations_by_page_conn(
     conn: &Connection,
     book_id: &str,
     page_number: i64,
-) -> Result<Vec<BookAnnotation>, String> {
+) -> Result<Vec<BookAnnotation>, AppError> {
     let sql = format!(
         "SELECT {COLS} FROM book_annotations
           WHERE book_id = ?1 AND page_number = ?2
@@ -94,20 +95,20 @@ fn get_annotations_by_page_conn(
     );
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| format!("Cannot read annotations: {e}"))?;
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))?;
     let rows = stmt
         .query_map(params![book_id, page_number], row_to_annotation)
-        .map_err(|e| format!("Cannot read annotations: {e}"))?;
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))?;
 
     rows.collect::<rusqlite::Result<Vec<BookAnnotation>>>()
-        .map_err(|e| format!("Cannot read annotations: {e}"))
+        .map_err(|e| AppError::database_error(format!("Cannot read annotations: {e}")))
 }
 
 fn update_annotation_note_conn(
     conn: &Connection,
     annotation_id: &str,
     note_text: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let updated = conn
         .execute(
             "UPDATE book_annotations
@@ -115,25 +116,29 @@ fn update_annotation_note_conn(
               WHERE id = ?1",
             params![annotation_id, note_text, chrono::Utc::now().to_rfc3339()],
         )
-        .map_err(|e| format!("Cannot update annotation {annotation_id}: {e}"))?;
+        .map_err(|e| {
+            AppError::database_error(format!("Cannot update annotation {annotation_id}: {e}"))
+        })?;
 
     if updated == 0 {
-        Err(format!("No annotation found with id {annotation_id}"))
+        Err(AppError::annotation_not_found(annotation_id))
     } else {
         Ok(())
     }
 }
 
-fn delete_annotation_conn(conn: &Connection, annotation_id: &str) -> Result<(), String> {
+fn delete_annotation_conn(conn: &Connection, annotation_id: &str) -> Result<(), AppError> {
     let deleted = conn
         .execute(
             "DELETE FROM book_annotations WHERE id = ?1",
             params![annotation_id],
         )
-        .map_err(|e| format!("Cannot delete annotation {annotation_id}: {e}"))?;
+        .map_err(|e| {
+            AppError::database_error(format!("Cannot delete annotation {annotation_id}: {e}"))
+        })?;
 
     if deleted == 0 {
-        Err(format!("No annotation found with id {annotation_id}"))
+        Err(AppError::annotation_not_found(annotation_id))
     } else {
         Ok(())
     }

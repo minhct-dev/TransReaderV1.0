@@ -2,6 +2,7 @@ use rusqlite::{Connection, params};
 
 use crate::models::dictionary_cache::DictionaryCache;
 use crate::storage::db::Db;
+use crate::utils::error::AppError;
 
 const INSERT_SQL: &str = "INSERT INTO dictionary_cache
     (id, word, data_json, last_accessed_at)
@@ -12,16 +13,17 @@ const INSERT_SQL: &str = "INSERT INTO dictionary_cache
 
 /// Store the raw API payload for a word, replacing an older entry for the same
 /// word so the cache keeps one row per lookup.
-pub fn add_dictionary_cache(db: &Db, cache: &DictionaryCache) -> Result<(), String> {
+pub fn add_dictionary_cache(db: &Db, cache: &DictionaryCache) -> Result<(), AppError> {
     add_dictionary_cache_conn(&db.conn(), cache)
 }
 
-/// Raw JSON previously cached for `word`, or an error when it is not cached.
-pub fn lookup_word_in_cache(db: &Db, word: &str) -> Result<String, String> {
+/// Raw JSON previously cached for `word`, or a `CACHE_MISS` error when it is
+/// not cached. A miss is expected, not a failure.
+pub fn lookup_word_in_cache(db: &Db, word: &str) -> Result<String, AppError> {
     lookup_word_conn(&db.conn(), word)
 }
 
-fn add_dictionary_cache_conn(conn: &Connection, cache: &DictionaryCache) -> Result<(), String> {
+fn add_dictionary_cache_conn(conn: &Connection, cache: &DictionaryCache) -> Result<(), AppError> {
     conn.execute(
         INSERT_SQL,
         params![
@@ -32,18 +34,22 @@ fn add_dictionary_cache_conn(conn: &Connection, cache: &DictionaryCache) -> Resu
         ],
     )
     .map(|_| ())
-    .map_err(|e| format!("Cannot add dictionary cache {}: {e}", cache.id))
+    .map_err(|e| {
+        AppError::database_error(format!("Cannot cache dictionary entry {}: {e}", cache.id))
+    })
 }
 
-fn lookup_word_conn(conn: &Connection, word: &str) -> Result<String, String> {
+fn lookup_word_conn(conn: &Connection, word: &str) -> Result<String, AppError> {
     conn.query_row(
         "SELECT data_json FROM dictionary_cache WHERE word = ?1",
         params![word],
         |row| row.get::<_, String>(0),
     )
     .map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => format!("Word '{word}' not found in cache"),
-        other => format!("Database error: {other}"),
+        rusqlite::Error::QueryReturnedNoRows => {
+            AppError::new("CACHE_MISS", format!("Word '{word}' is not cached."))
+        }
+        other => AppError::database_error(format!("Cannot read the dictionary cache: {other}")),
     })
 }
 

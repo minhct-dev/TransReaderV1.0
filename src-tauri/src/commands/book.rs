@@ -4,12 +4,13 @@ use uuid::Uuid;
 
 use crate::models::book::Book;
 use crate::storage::db::{self, Db};
+use crate::utils::error::AppError;
 use crate::utils::file_parser;
 use crate::utils::win_file_id;
 
 /// Every non-deleted book in the library, newest first.
 #[tauri::command]
-pub fn get_all_books(db: State<'_, Db>) -> Result<Vec<Book>, String> {
+pub fn get_all_books(db: State<'_, Db>) -> Result<Vec<Book>, AppError> {
     db::get_books(&db)
 }
 
@@ -17,7 +18,7 @@ pub fn get_all_books(db: State<'_, Db>) -> Result<Vec<Book>, String> {
 /// Returns `Ok(None)` only when the user cancels; re-importing a file that is
 /// already in the library returns that book instead of creating a duplicate.
 #[tauri::command]
-pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>, String> {
+pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>, AppError> {
     let Some(file_path) = pick_document(&app).await? else {
         return Ok(None);
     };
@@ -53,17 +54,17 @@ pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>,
 
 //Delete book
 #[tauri::command]
-pub fn delete_book(db: State<'_, Db>, book_id: String) -> Result<(), String> {
+pub fn delete_book(db: State<'_, Db>, book_id: String) -> Result<(), AppError> {
     db::delete_book(&db, &book_id)
 }
 
 /// Absolute path of a library book, for the webview to turn into an asset URL.
 #[tauri::command]
-pub fn resolve_book_path(db: State<'_, Db>, book_id: String) -> Result<String, String> {
+pub fn resolve_book_path(db: State<'_, Db>, book_id: String) -> Result<String, AppError> {
     db::book_path(&db, &book_id)
 }
 
-async fn pick_document(app: &AppHandle) -> Result<Option<String>, String> {
+async fn pick_document(app: &AppHandle) -> Result<Option<String>, AppError> {
     let (tx, rx) = tokio::sync::oneshot::channel();
 
     app.dialog()
@@ -75,7 +76,7 @@ async fn pick_document(app: &AppHandle) -> Result<Option<String>, String> {
 
     let picked = rx
         .await
-        .map_err(|_| "The file dialog closed unexpectedly".to_string())?;
+        .map_err(|_| AppError::file_dialog_error("The file dialog closed unexpectedly."))?;
 
     Ok(picked.map(|path| path.to_string()))
 }
