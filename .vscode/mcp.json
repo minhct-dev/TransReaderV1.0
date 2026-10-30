@@ -1,0 +1,28 @@
+{
+  "servers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "C:\\Users\\minhi\\.codegraph\\bin\\codegraph-server.exe",
+      "args": [
+        "--mcp",
+        "--workspace",
+        "D:\\ListPorject\\TransReaderV1.0"
+      ]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "${input:context7-api-key}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "context7-api-key",
+      "type": "promptString",
+      "description": "Context7 API key (starts with ctx7sk)",
+      "password": true
+    }
+  ]
+}
