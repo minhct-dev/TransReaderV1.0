@@ -3,6 +3,12 @@ import type { Book, BookDto } from "../types/book";
 import type { BookAnnotation } from "../types/annotation";
 import type { DictionaryEntry } from "../types/dictionary";
 
+export interface TranslationResult {
+  originalText: string;
+  translatedText: string;
+  targetLanguage: string;
+}
+
 function mapBookDtoToBook(dto: BookDto): Book {
   const cover = dto.cover_url ?? null;
   return {
@@ -78,5 +84,15 @@ export async function deleteAnnotation(annotationId: string): Promise<void> {
  */
 export async function lookupDictionary(word: string): Promise<DictionaryEntry[]> {
   return invoke<DictionaryEntry[]>("lookup_dictionary", { word });
+}
+
+export async function translateText(
+  text: string,
+  targetLanguage: string,
+): Promise<TranslationResult> {
+  return invoke<TranslationResult>("translate_with_google", {
+    text,
+    targetLanguage,
+  });
 }
 

@@ -11,6 +11,7 @@ import AnnotationOverlay from "./AnnotationOverlay";
 import AnnotationPopover from "./AnnotationPopover";
 import NoteComposer from "./NoteComposer";
 import DictionaryPopover from "./DictionaryPopover";
+import TranslationPopover from "./TranslationPopover";
 import { useTextSelection } from "./useTextSelection";
 import type { TextSelection } from "./useTextSelection";
 import { loadOutline } from "./readerOutline";
@@ -91,6 +92,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
   const [activeAnnotation, setActiveAnnotation] = useState<ActiveAnnotation | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const [dictionaryTarget, setDictionaryTarget] = useState<DictionaryTarget | null>(null);
+  const [translationTarget, setTranslationTarget] = useState<SelectionMenu | null>(null);
   const [focusedAnnotationId, setFocusedAnnotationId] = useState<string | null>(null);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
 
@@ -147,6 +149,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     setNoteDraft(null);
     setSelectionMenu(null);
     setDictionaryTarget(null);
+    setTranslationTarget(null);
     textCacheRef.current.clear();
     zoomTouchedRef.current = false;
 
@@ -405,6 +408,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
       isSingleWord: selection.isSingleWord,
     });
     setActiveAnnotation(null);
+    setTranslationTarget(null);
   }, []);
 
   useTextSelection({
@@ -542,6 +546,13 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
     },
     [pdf, scrollToPage],
   );
+
+  const handleTranslate = () => {
+    if (!selectionMenu) return;
+    setTranslationTarget(selectionMenu);
+    closeSelectionMenu();
+    window.getSelection()?.removeAllRanges();
+  };
 
   const handleDictionary = () => {
     if (!selectionMenu) return;
@@ -743,6 +754,7 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
           onHighlight={handleHighlight}
           onAddNote={handleAddNote}
           onDictionary={handleDictionary}
+          onTranslate={handleTranslate}
           onShare={handleShare}
         />
       )}
@@ -755,6 +767,22 @@ export default function ReaderCanvas({ book, onClose }: ReaderCanvasProps) {
           y={dictionaryTarget.y}
           singleWord={dictionaryTarget.singleWord}
           onClose={() => setDictionaryTarget(null)}
+        />
+      )}
+
+      {translationTarget && (
+        <TranslationPopover
+          key={`${translationTarget.text}:${translationTarget.x}:${translationTarget.y}`}
+          text={translationTarget.text}
+          x={translationTarget.x}
+          y={translationTarget.y}
+          onClose={() => setTranslationTarget(null)}
+          onSave={(translatedText) => {
+            window.localStorage.setItem(
+              "transreader.translation_notes",
+              JSON.stringify({ originalText: translationTarget.text, translatedText, savedAt: new Date().toISOString() }),
+            );
+          }}
         />
       )}
 

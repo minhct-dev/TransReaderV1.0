@@ -4,7 +4,6 @@ use reqwest::Client;
 
 use crate::utils::error::AppError;
 
-// const GOOGLE_TRANSLATE_ENDPOINT: &str = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_language}&dt=t&q={word}";
 const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
 const TIMEOUT_SECS: u64 = 10;
 
@@ -48,11 +47,3 @@ pub async fn get_dictionary_data_by_word(word: &str) -> Result<String, AppError>
         ))),
     }
 }
-
-// pub async fn translate_with_google(word: &str, target_language: &str) -> Result<String, String> {
-//     // Implementation for Google Translate API
-
-
-//     return '';
-
-// }

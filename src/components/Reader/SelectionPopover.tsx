@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { BookOpen, Plus, Share2 } from "lucide-react";
+import { BookOpen, Languages, Plus, Share2 } from "lucide-react";
 import { HIGHLIGHT_COLORS } from "./annotationUtils";
 
 interface SelectionPopoverProps {
@@ -9,6 +9,7 @@ interface SelectionPopoverProps {
   onHighlight: (color: string) => void;
   onAddNote: () => void;
   onDictionary: () => void;
+  onTranslate: () => void;
   onShare: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function SelectionPopover({
   onHighlight,
   onAddNote,
   onDictionary,
+  onTranslate,
   onShare,
 }: SelectionPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,7 @@ export default function SelectionPopover({
       <div className="flex flex-col">
         <PopoverAction label="ADD NOTE" icon={<Plus size={13} />} onClick={onAddNote} />
         <PopoverAction label="DICTIONARY" icon={<BookOpen size={13} />} onClick={onDictionary} />
+        <PopoverAction label="TRANSLATE" icon={<Languages size={13} />} onClick={onTranslate} />
         <PopoverAction label="SHARE" icon={<Share2 size={13} />} onClick={onShare} />
       </div>
     </div>
