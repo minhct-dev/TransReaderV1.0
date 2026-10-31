@@ -46,6 +46,11 @@ export async function resolveBookPath(bookId: string): Promise<string> {
   return invoke<string>("resolve_book_path", { bookId });
 }
 
+/** File size and modification timestamp used to invalidate generated PDF covers. */
+export async function getBookFileSignature(bookId: string): Promise<string> {
+  return invoke<string>("get_book_file_signature", { bookId });
+}
+
 /** Persist a new highlight or note. The object must carry its id and timestamps. */
 export async function addAnnotation(annotation: BookAnnotation): Promise<void> {
   await invoke<void>("add_annotation", { annotation });

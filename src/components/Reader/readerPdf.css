@@ -19,3 +19,17 @@
 .react-pdf__Page__canvas {
   display: block;
 }
+
+/* Keep pdf.js text selectable without painting a second copy of the page text.
+   The canvas is the visual source; the text layer exists only for selection. */
+.react-pdf__Page__textContent,
+.react-pdf__Page__textContent span,
+.react-pdf__Page__textContent br {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.react-pdf__Page__textContent ::selection {
+  background: rgba(91, 137, 121, 0.3);
+  color: transparent;
+}

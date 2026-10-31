@@ -1,31 +1,27 @@
-/* Full-Width Sticky Glassmorphism Header */
 .header {
   position: fixed;
   top: 0;
-  left: 0;
-  width: 100%;
+  left: 72px;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  padding: 12px 32px 12px 96px; /* 64px collapsed sidebar + 32px offset */
+  width: calc(100% - 72px);
+  padding: 16px clamp(20px, 3.2vw, 48px) 12px;
+  border-bottom: 1px solid rgba(43, 60, 56, 0.08);
+  background: rgba(248, 250, 249, 0.94);
   box-sizing: border-box;
 }
 
-/* Row 1: Perfectly centered search bar */
 .header__search-row {
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 13px;
 }
 
 .header__search-wrapper {
   position: relative;
-  width: 100%;
-  max-width: 550px;
+  display: block;
+  width: min(100%, 590px);
   margin: 0 auto;
 }
 
@@ -34,96 +30,94 @@
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-muted);
+  color: #687974;
   pointer-events: none;
 }
 
 .header__search-input {
   width: 100%;
   height: 44px;
-  padding-left: 46px;
-  padding-right: 18px;
-  border-radius: 9999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #ffffff;
-  font-size: 14px;
-  color: var(--color-ink);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 0 18px 0 46px;
+  border: 1px solid #dce4e1;
+  border-radius: 13px;
+  background: #fff;
+  color: #2b3d39;
+  font: inherit;
+  font-size: 13px;
+  box-shadow: 0 2px 7px rgba(34, 53, 48, 0.035);
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .header__search-input:focus {
-  border-color: rgba(0, 0, 0, 0.18);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: #8aa49c;
+  box-shadow: 0 0 0 3px rgba(92, 132, 119, 0.13);
 }
 
-.header__search-input::placeholder {
-  color: var(--color-muted);
-}
+.header__search-input::placeholder { color: #687974; }
 
-/* Row 2: Sub-header / Toolbar */
 .header__toolbar-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  max-width: 1440px;
+  max-width: 1500px;
   margin: 0 auto;
   gap: 16px;
 }
 
-.header__toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.header__toolbar-left,
+.header__toolbar-right { display: flex; align-items: center; }
+.header__toolbar-left { gap: 12px; }
 
 .header__badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 14px;
-  border-radius: 9999px;
-  background-color: rgba(43, 45, 49, 0.06);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-ink);
+  padding: 6px 12px;
+  border: 1px solid #dce5e2;
+  border-radius: 9px;
+  background: #eaf0ee;
+  color: #30443f;
+  font-size: 12px;
+  font-weight: 650;
   letter-spacing: -0.01em;
 }
 
 .header__counter {
-  font-size: 13px;
-  color: var(--color-muted);
+  color: #5d706b;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.header__toolbar-right {
-  display: flex;
-  align-items: center;
 }
 
 .header__add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 9999px;
-  background-color: #f3f4f6;
-  color: #1f2937;
-  font-size: 13px;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #d5e0dc;
+  border-radius: 10px;
+  background: #fff;
+  color: #30443f;
+  font-size: 12px;
   font-weight: 600;
-  border: 1px solid #e5e7eb;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: none;
-  transition: all 0.2s ease;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
-.header__add-btn:hover {
-  background-color: #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
+.header__add-btn:hover { border-color: #b8cbc4; background: #f3f7f5; }
+.header__add-btn:active { transform: translateY(1px); }
+.header__add-btn:focus-visible { outline: 2px solid #547d72; outline-offset: 2px; }
 
-.header__add-btn:active {
-  background-color: #d1d5db;
+@media (max-width: 640px) {
+  .header { left: 0; width: 100%; padding: 12px 16px 10px; }
+  .header__search-row { margin-bottom: 10px; }
+  .header__search-input { height: 41px; }
+  .header__badge { padding: 5px 9px; }
+  .header__toolbar-left { gap: 8px; }
+  .header__counter { font-size: 11px; }
+  .header__add-btn { min-height: 34px; padding: 0 10px; }
 }

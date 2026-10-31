@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { loadPdfCover } from "../../services/coverCache";
 import type { MouseEvent } from "react";
 import type { Book } from "../../types/book";
 import { DocumentIcon } from "../icons";
@@ -8,21 +9,18 @@ const formatLabel = (f: Book["format"]) =>
   f === "DOCX" ? ".DOCX" : f === "TXT" ? ".TXT" : ".PDF";
 
 /** Theme colors for format-based placeholder covers */
-const formatTheme: Record<Book["format"], { bg: string; text: string; iconBg: string }> = {
+const formatTheme: Record<Book["format"], { bg: string; iconBg: string }> = {
   PDF: {
-    bg: "from-rose-50 to-red-100/70 border-red-200/60",
-    text: "text-red-700",
-    iconBg: "bg-red-500/10 text-red-600",
+    bg: "#f1e9dd",
+    iconBg: "#e5dbcc",
   },
   DOCX: {
-    bg: "from-blue-50 to-indigo-100/70 border-blue-200/60",
-    text: "text-blue-700",
-    iconBg: "bg-blue-500/10 text-blue-600",
+    bg: "#e5edf0",
+    iconBg: "#d5e2e5",
   },
   TXT: {
-    bg: "from-stone-50 to-amber-100/60 border-amber-200/60",
-    text: "text-amber-800",
-    iconBg: "bg-amber-500/10 text-amber-700",
+    bg: "#e9ede4",
+    iconBg: "#dce4d5",
   },
 };
 
@@ -34,12 +32,49 @@ interface BookCardProps {
 
 export default function BookCard({ book, onOpen, onContextMenu }: BookCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  const coverUrl = book.cover_url ?? book.coverUrl;
+  const [generatedCover, setGeneratedCover] = useState<string | null>(null);
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const persistedCover = book.cover_url ?? book.coverUrl;
+  const coverUrl = persistedCover ?? generatedCover;
   const showImage = Boolean(coverUrl && coverUrl.trim().length > 0 && !imgFailed);
   const theme = formatTheme[book.format] ?? formatTheme.TXT;
 
+  useEffect(() => {
+    if (persistedCover || book.format !== "PDF") return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    let observer: IntersectionObserver | null = null;
+    const generateWhenVisible = () => {
+      void loadPdfCover(book.id).then((image) => {
+        if (!image || cancelled) return;
+        objectUrl = URL.createObjectURL(image);
+        setGeneratedCover(objectUrl);
+      });
+    };
+
+    if ("IntersectionObserver" in window && cardRef.current) {
+      observer = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+          observer?.disconnect();
+          generateWhenVisible();
+        }
+      }, { rootMargin: "180px" });
+      observer.observe(cardRef.current);
+    } else {
+      generateWhenVisible();
+    }
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [book.id, book.format, persistedCover]);
+
   return (
     <a
+      ref={cardRef}
       href={`#book-${book.id}`}
       onClick={(event) => {
         event.preventDefault();
@@ -61,24 +96,26 @@ export default function BookCard({ book, onOpen, onContextMenu }: BookCardProps)
           />
         ) : (
           <div
-            className={`flex h-full w-full flex-col justify-between border bg-gradient-to-b p-4 ${theme.bg}`}
+            className="flex h-full w-full flex-col justify-between p-4 text-[#3f4943]"
+            style={{ background: `linear-gradient(150deg, ${theme.bg} 0%, #faf7f1 100%)` }}
           >
-            <div className="flex items-center justify-between">
-              <span className={`text-[10px] font-semibold tracking-wider uppercase ${theme.text}`}>
-                {book.topic || "DOCUMENT"}
-              </span>
-            </div>
+            <span className="max-w-full truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-[#718078]">
+              {formatLabel(book.format).slice(1)}
+            </span>
 
             <div className="my-auto flex flex-col items-center px-1 text-center">
-              <div className={`mb-3 grid size-12 place-items-center rounded-2xl ${theme.iconBg}`}>
+              <div
+                className="mb-3 grid size-12 place-items-center rounded-full text-[#596c62]"
+                style={{ background: theme.iconBg }}
+              >
                 <DocumentIcon width={24} height={24} />
               </div>
-              <span className="line-clamp-3 text-sm font-semibold leading-snug text-ink">
+              <span className="line-clamp-3 text-sm font-semibold leading-snug">
                 {book.title}
               </span>
             </div>
 
-            <span className="text-[11px] truncate text-center text-muted">
+            <span className="truncate text-center text-[11px] text-[#718078]">
               {book.author}
             </span>
           </div>

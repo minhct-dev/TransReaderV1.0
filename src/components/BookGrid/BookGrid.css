@@ -1,15 +1,71 @@
 .book-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(166px, 1fr));
+  align-items: start;
+  gap: 34px 27px;
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
+.book-grid > li { min-width: 0; }
+.book-grid > li > a { width: 100%; }
+.book-grid .group-hover\:scale-105 { transform-origin: center bottom; }
+
 .book-grid__empty {
-  padding: 96px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  gap: 10px;
+  padding: 60px 24px;
+  color: #566a66;
   text-align: center;
-  font-size: 14px;
-  color: var(--color-muted);
+}
+
+.book-grid__empty > svg { color: #58776f; }
+.book-grid__empty p,
+.book-grid__empty h2 { margin: 0; }
+.book-grid__empty p { font-size: 14px; }
+.book-grid__empty > span:not(.book-grid__empty-art) { color: #647671; font-size: 12px; }
+
+.book-grid__empty--library { min-height: min(58vh, 480px); gap: 14px; }
+.book-grid__empty--library h2 { color: #293c39; font-size: 25px; letter-spacing: -0.035em; }
+.book-grid__empty--library p { max-width: 34ch; color: #5b6d68; line-height: 1.55; }
+.book-grid__empty-art {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin-bottom: 5px;
+  border-radius: 22px;
+  background: #e7eeec;
+  color: #36574f;
+}
+.book-grid__empty--library button {
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 11px;
+  background: #344e47;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.book-grid__empty--library button:hover { background: #263d37; }
+.book-grid__empty--library button:focus-visible { outline: 2px solid #547d72; outline-offset: 3px; }
+
+@media (min-width: 1500px) {
+  .book-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 40px 34px; }
+}
+
+@media (max-width: 760px) {
+  .book-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 28px 18px; }
+}
+
+@media (max-width: 480px) {
+  .book-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 23px 16px; }
 }

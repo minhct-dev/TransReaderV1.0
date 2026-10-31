@@ -64,6 +64,24 @@ pub fn resolve_book_path(db: State<'_, Db>, book_id: String) -> Result<String, A
     db::book_path(&db, &book_id)
 }
 
+/// A stable cache version for a book's rendered cover thumbnail.
+#[tauri::command]
+pub fn get_book_file_signature(db: State<'_, Db>, book_id: String) -> Result<String, AppError> {
+    let path = db::book_path(&db, &book_id)?;
+    let metadata = std::fs::metadata(&path)
+        .map_err(|error| AppError::internal(format!("Cannot inspect book file: {error}")))?;
+    let modified = metadata
+        .modified()
+        .map_err(|error| AppError::internal(format!("Cannot read book modification time: {error}")))?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| AppError::internal(format!("Invalid book modification time: {error}")))?
+        .as_nanos();
+    // shortcut: avoid hashing large PDFs at launch; hash content if in-place edits with restored timestamps cause stale covers.
+    let file_id = win_file_id::get_file_id(&path).unwrap_or_default();
+
+    Ok(format!("{file_id}-{}-{modified}", metadata.len()))
+}
+
 async fn pick_document(app: &AppHandle) -> Result<Option<String>, AppError> {
     let (tx, rx) = tokio::sync::oneshot::channel();
 

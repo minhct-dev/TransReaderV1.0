@@ -25,7 +25,7 @@ export default function Header({
             type="search"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search books, topics, or notes..."
+            placeholder="Search books, authors, or topics..."
             className="header__search-input"
           />
         </label>

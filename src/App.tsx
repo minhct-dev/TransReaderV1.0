@@ -12,11 +12,18 @@ export default function App() {
   const [query, setQuery] = useState("");
   /** Book open in the reader; `null` shows the library. */
   const [reading, setReading] = useState<Book | null>(null);
+  const [libraryLoadError, setLibraryLoadError] = useState(false);
 
   useEffect(() => {
     getLibraryBooks()
-      .then(setBooks)
-      .catch((err) => console.error("Failed to load books:", err));
+      .then((loadedBooks) => {
+        setBooks(loadedBooks);
+        setLibraryLoadError(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load books:", err);
+        setLibraryLoadError(true);
+      });
   }, []);
 
   const visible = useMemo(() => {
@@ -67,12 +74,28 @@ export default function App() {
 
       <main className="main-content">
         <div className="content-wrapper">
-          <section id="library" aria-label="Book library">
-            <BookGrid
-              books={visible}
-              onOpenBook={setReading}
-              onRemoveBook={handleRemoveBook}
-            />
+          <section id="library" className="library-section" aria-label="Book library">
+            <div className="library-section__heading">
+              <h1>{query.trim() ? "Search results" : "Your library"}</h1>
+              <p>{query.trim() ? `${visible.length} matching ${visible.length === 1 ? "book" : "books"}` : "A little more room for your next big idea."}</p>
+            </div>
+            {libraryLoadError ? (
+              <div className="library-error" role="alert">
+                <p>Your library couldn’t be loaded.</p>
+                <button type="button" onClick={() => {
+                  setLibraryLoadError(false);
+                  getLibraryBooks().then(setBooks).catch(() => setLibraryLoadError(true));
+                }}>Try again</button>
+              </div>
+            ) : (
+              <BookGrid
+                books={visible}
+                hasQuery={Boolean(query.trim())}
+                onAddBook={handleAddBook}
+                onOpenBook={setReading}
+                onRemoveBook={handleRemoveBook}
+              />
+            )}
           </section>
         </div>
       </main>

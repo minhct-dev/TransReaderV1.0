@@ -1,18 +1,25 @@
 .app-container {
-  display: flex;
-  min-height: 100vh;
-  background-color: var(--color-canvas);
   position: relative;
+  min-height: 100vh;
+  background: #f2f5f4;
 }
 
 .main-content {
-  flex: 1;
+  min-height: 100vh;
   min-width: 0;
-  margin-left: 64px;
-  padding: 130px 32px 48px 32px;
+  margin-left: 72px;
+  padding: 154px clamp(24px, 4vw, 64px) 56px;
+  box-sizing: border-box;
 }
 
 .content-wrapper {
-  max-width: 1440px;
+  width: min(100%, 1480px);
   margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    margin-left: 0;
+    padding: 142px 18px 88px;
+  }
 }

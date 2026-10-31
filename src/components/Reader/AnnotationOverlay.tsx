@@ -104,7 +104,7 @@ export default function AnnotationOverlay({
                   event.stopPropagation();
                   onOpen(annotation, event.clientX, event.clientY);
                 }}
-                className={`annotation-hit pointer-events-auto absolute rounded-[2px] border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 ${
+                className={`annotation-hit absolute rounded-[2px] border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 ${
                   isFocused ? "annotation-flash" : ""
                 }`}
                 style={{

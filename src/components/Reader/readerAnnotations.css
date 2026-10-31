@@ -1,4 +1,7 @@
 .annotation-hit {
+  /* Highlights must never sit in front of the PDF text layer while dragging.
+     Otherwise the browser selects the overlay button instead of the document. */
+  pointer-events: none !important;
   transition:
     background-color 140ms ease,
     box-shadow 140ms ease;
