@@ -1,0 +1,14 @@
+[
+  {
+    "word": "hello",
+    "phonetic": "/həˈləʊ/",
+    "phonetics": [{ "text": "/həˈləʊ/", "audio": "" }],
+    "meanings": [
+      {
+        "partOfSpeech": "interjection",
+        "definitions": [{ "definition": "A greeting used when meeting someone.", "example": "Hello, how are you?" }]
+      }
+    ],
+    "sourceUrls": ["https://en.wiktionary.org/wiki/hello"]
+  }
+]

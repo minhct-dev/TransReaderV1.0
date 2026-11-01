@@ -1,0 +1,4 @@
+selenium>=4.34,<5
+pytest>=8,<9
+pytest-html>=4,<5
+fpdf2>=2.8,<3
