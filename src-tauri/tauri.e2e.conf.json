@@ -1,0 +1,6 @@
+{
+  "identifier": "com.minhct.transreader.e2e",
+  "app": {
+    "windows": [{ "title": "minhct-transreader", "width": 1280, "height": 900 }]
+  }
+}

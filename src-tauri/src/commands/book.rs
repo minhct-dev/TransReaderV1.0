@@ -22,12 +22,28 @@ pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>,
     let Some(file_path) = pick_document(&app).await? else {
         return Ok(None);
     };
+    import_book(&db, file_path)
+}
+
+/// Debug builds only: WebDriver cannot click the native file picker, so the
+/// E2E suite imports a book by path instead.
+#[tauri::command]
+pub fn e2e_import_book(db: State<'_, Db>, file_path: String) -> Result<Option<Book>, AppError> {
+    if !cfg!(debug_assertions) {
+        return Err(AppError::invalid_input(
+            "e2e_import_book is only available in debug builds.",
+        ));
+    }
+    import_book(&db, file_path)
+}
+
+fn import_book(db: &Db, file_path: String) -> Result<Option<Book>, AppError> {
     // `None` off-Windows or when the volume has no file ids; the book is still importable.
     let file_id = win_file_id::get_file_id(&file_path);
     // Importing a file that was removed earlier restores the old row instead of
     // adding a duplicate. An already-active book comes back too, so the
     // frontend can dedupe it by path.
-    if let Some(existing) = db::revive_book(&db, &file_id, &file_path)? {
+    if let Some(existing) = db::revive_book(db, &file_id, &file_path)? {
         return Ok(Some(existing));
     }
     let book = Book {
@@ -44,8 +60,7 @@ pub async fn add_book(app: AppHandle, db: State<'_, Db>) -> Result<Option<Book>,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    // Nothing is held across the await above, so the mutex is only locked here.
-    if !db::insert_book(&db, &book)? {
+    if !db::insert_book(db, &book)? {
         return Ok(None);
     }
 

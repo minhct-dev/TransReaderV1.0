@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use reqwest::Client;
 
+use crate::utils::endpoint::endpoint;
 use crate::utils::error::AppError;
 
 const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
@@ -22,7 +23,10 @@ pub async fn get_dictionary_data_by_word(word: &str) -> Result<String, AppError>
         })?;
 
     let response = client
-        .get(format!("{ENDPOINT}/{word}"))
+        .get(format!(
+            "{}/{word}",
+            endpoint("TRANSREADER_DICTIONARY_URL", ENDPOINT)
+        ))
         .send()
         .await
         .map_err(|e| AppError::http_request_failed(format!("The dictionary is unreachable: {e}")))?;

@@ -21,6 +21,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::book::get_all_books,
             commands::book::add_book,
+            commands::book::e2e_import_book,
             commands::book::delete_book,
             commands::book::resolve_book_path,
             commands::book::get_book_file_signature,

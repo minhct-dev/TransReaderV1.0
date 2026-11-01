@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use reqwest::Client;
 
+use crate::utils::endpoint::endpoint;
 use crate::utils::error::AppError;
 
 const GOOGLE_TRANSLATE_API: &str = "https://translate.googleapis.com/translate_a/single";
@@ -42,7 +43,7 @@ pub async fn google_translate_text(text: &str, target_language: &str) -> Result<
     }
 
     let response = http_client()?
-        .get(GOOGLE_TRANSLATE_API)
+        .get(endpoint("TRANSREADER_GOOGLE_TRANSLATE_URL", GOOGLE_TRANSLATE_API))
         .query(&[
             ("client", "gtx"),
             ("sl", "auto"),
@@ -87,7 +88,7 @@ pub async fn libre_translate_text(text: &str, target_language: &str) -> Result<S
     }
 
     let response = http_client()?
-        .post(LIBRE_TRANSLATE_API)
+        .post(endpoint("TRANSREADER_LIBRE_TRANSLATE_URL", LIBRE_TRANSLATE_API))
         .form(&[
             ("q", text),
             ("source", "auto"),
